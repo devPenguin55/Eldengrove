@@ -57,9 +57,10 @@ typedef struct BlockType
     int topTexture;
     int bottomTexture;
     int sideTexture;
-    int isSolid;
+    int isRenderSolid;
     int blockBreakingTime;
-    int isCross;
+    int isRenderCross;
+    int isPhysicsSolid;
 } BlockType;
 
 // these are the face types
