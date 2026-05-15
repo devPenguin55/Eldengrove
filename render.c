@@ -12,6 +12,7 @@
 #include "chunks.h"
 #include "chunkLoaderManager.h"
 #include "raycast.h"
+#include "player.h"
 
 GLfloat T = 0;
 
@@ -38,7 +39,6 @@ int waterVertexCapacity = 0;
 
 GLuint blockTextureArray;
 
-
 int hotbarBlocks[9];
 int hotbarActiveSlot = -1;
 
@@ -57,34 +57,35 @@ static inline float clamp(float value, float minVal, float maxVal)
 }
 
 GLuint worldShader;
-char* loadFile(const char* path)
+char *loadFile(const char *path)
 {
-    FILE* file = fopen(path,"rb");
-    fseek(file,0,SEEK_END);
+    FILE *file = fopen(path, "rb");
+    fseek(file, 0, SEEK_END);
     long size = ftell(file);
     rewind(file);
 
-    char* data = malloc(size+1);
-    fread(data,1,size,file);
-    data[size]=0;
+    char *data = malloc(size + 1);
+    fread(data, 1, size, file);
+    data[size] = 0;
     fclose(file);
 
     return data;
 }
 
-GLuint compileShader(const char* path, GLenum type)
+GLuint compileShader(const char *path, GLenum type)
 {
-    char* src = loadFile(path);
+    char *src = loadFile(path);
 
     GLuint shader = glCreateShader(type);
-    glShaderSource(shader,1,(const char**)&src,NULL);
+    glShaderSource(shader, 1, (const char **)&src, NULL);
     glCompileShader(shader);
 
     free(src);
-    
+
     GLint success;
     glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
-    if (!success) {
+    if (!success)
+    {
         char log[512];
         glGetShaderInfoLog(shader, 512, NULL, log);
         printf("Shader compile error: %s\n", log);
@@ -92,8 +93,6 @@ GLuint compileShader(const char* path, GLenum type)
 
     return shader;
 }
-
-
 
 GLuint loadTexture(const char *filename)
 {
@@ -139,10 +138,12 @@ GLuint loadTexture(const char *filename)
     return textureID;
 }
 
-GLuint loadTextureArray(const char* filenames[], int count) {
+GLuint loadTextureArray(const char *filenames[], int count)
+{
     int width, height, channels;
-    unsigned char* data = stbi_load(filenames[0], &width, &height, &channels, 0);
-    if (!data) {
+    unsigned char *data = stbi_load(filenames[0], &width, &height, &channels, 0);
+    if (!data)
+    {
         printf("Failed to load texture %s\n", filenames[0]);
         return 0;
     }
@@ -157,9 +158,14 @@ GLuint loadTextureArray(const char* filenames[], int count) {
     glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, format, width, height, count, 0, format, GL_UNSIGNED_BYTE, NULL);
 
     // Load each layer
-    for (int i = 0; i < count; i++) {
-        unsigned char* layerData = stbi_load(filenames[i], &width, &height, &channels, 4);
-        if (!layerData) { printf("Failed to load %s\n", filenames[i]); continue; }
+    for (int i = 0; i < count; i++)
+    {
+        unsigned char *layerData = stbi_load(filenames[i], &width, &height, &channels, 4);
+        if (!layerData)
+        {
+            printf("Failed to load %s\n", filenames[i]);
+            continue;
+        }
         glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, i, width, height, 1, format, GL_UNSIGNED_BYTE, layerData);
         stbi_image_free(layerData);
     }
@@ -172,31 +178,36 @@ GLuint loadTextureArray(const char* filenames[], int count) {
     return texArray;
 }
 
-int isCameraInWater() {
-    int voxelX = (int)round(CameraX / BlockWidthX);
-    int voxelY = (int)round(CameraY / BlockHeightY);
-    int voxelZ = (int)round(CameraZ / BlockLengthZ);
+int isCameraInWater()
+{
+    int voxelX = (int)round(eyeX / BlockWidthX);
+    int voxelY = (int)round(eyeY / BlockHeightY);
+    int voxelZ = (int)round(eyeZ / BlockLengthZ);
 
-    int chunkX = (voxelX >= 0) ? voxelX / ChunkWidthX : (voxelX - (ChunkWidthX-1)) / ChunkWidthX;
-    int chunkZ = (voxelZ >= 0) ? voxelZ / ChunkLengthZ : (voxelZ - (ChunkLengthZ-1)) / ChunkLengthZ;
+    int chunkX = (voxelX >= 0) ? voxelX / ChunkWidthX : (voxelX - (ChunkWidthX - 1)) / ChunkWidthX;
+    int chunkZ = (voxelZ >= 0) ? voxelZ / ChunkLengthZ : (voxelZ - (ChunkLengthZ - 1)) / ChunkLengthZ;
 
     voxelX = voxelX - chunkX * ChunkWidthX;
     voxelY = voxelY;
     voxelZ = voxelZ - chunkZ * ChunkLengthZ;
-     
+
     uint64_t chunkKey = packChunkKey(chunkX, chunkZ);
-    BucketEntry* result = getHashmapEntry(chunkKey);
-    if (!result) { return 0; };
+    BucketEntry *result = getHashmapEntry(chunkKey);
+    if (!result)
+    {
+        return 0;
+    };
 
     Chunk *curChunk = result->chunkEntry;
-    int index = voxelX + ChunkWidthX * voxelZ + (ChunkWidthX*ChunkLengthZ)*voxelY;
+    int index = voxelX + ChunkWidthX * voxelZ + (ChunkWidthX * ChunkLengthZ) * voxelY;
 
     Block *block = &curChunk->blocks[index];
     return (block != NULL && block->blockType == BLOCK_TYPE_WATER);
 }
 
-float getWaterScreenY(int windowHeight) {
-    float waterY = (SEA_LEVEL > CameraY) ? windowHeight * 0.3f : windowHeight * 0.7f;
+float getWaterScreenY(int windowHeight)
+{
+    float waterY = (SEA_LEVEL > eyeY) ? windowHeight * 0.3f : windowHeight * 0.7f;
 
     return waterY;
 }
@@ -231,8 +242,7 @@ void initGraphics()
     hotbarBlocks[1] = BLOCK_TYPE_GRASS;
     hotbarBlocks[2] = BLOCK_TYPE_LEAVES;
 
-    hotbarActiveSlot = 2;
-
+    hotbarActiveSlot = 1;
 
     GLuint vs = compileShader("shader.vert", GL_VERTEX_SHADER);
     GLuint fs = compileShader("shader.frag", GL_FRAGMENT_SHADER);
@@ -247,27 +257,25 @@ void initGraphics()
     glBindAttribLocation(worldShader, 2, "layer");
     glLinkProgram(worldShader);
 
-
-    const char* blockTextures[] = {
-        "assets\\grassSide.png", // 0
-        "assets\\grassTop.png", // 1
-        "assets\\dirt.png", // 2
-        "assets\\stone.png", // 3
-        "assets\\water.png", // 4
-        "assets\\sand.png", // 5
-        "assets\\oak_log.png", // 6
+    const char *blockTextures[] = {
+        "assets\\grassSide.png",   // 0
+        "assets\\grassTop.png",    // 1
+        "assets\\dirt.png",        // 2
+        "assets\\stone.png",       // 3
+        "assets\\water.png",       // 4
+        "assets\\sand.png",        // 5
+        "assets\\oak_log.png",     // 6
         "assets\\oak_log_top.png", // 7
-        "assets\\leaves.png", // 8
-        "assets\\blue_orchid.png", // 9 
-        "assets\\short_grass.png" // 10
+        "assets\\leaves.png",      // 8
+        "assets\\blue_orchid.png", // 9
+        "assets\\short_grass.png"  // 10
     };
-
 
     int GRASS_SIDE_TEXTURE_ARRAY_INDEX = 0;
     int GRASS_TOP_TEXTURE_ARRAY_INDEX = 1;
     int DIRT_TEXTURE_ARRAY_INDEX = 2;
-    int STONE_TEXTURE_ARRAY_INDEX = 3; 
-    int WATER_TEXTURE_ARRAY_INDEX = 4; 
+    int STONE_TEXTURE_ARRAY_INDEX = 3;
+    int WATER_TEXTURE_ARRAY_INDEX = 4;
     int SAND_TEXTURE_ARRAY_INDEX = 5;
     int OAK_SIDE_TEXTURE_ARRAY_INDEX = 6;
     int OAK_TOP_TEXTURE_ARRAY_INDEX = 7;
@@ -281,10 +289,9 @@ void initGraphics()
         .topTexture = GRASS_TOP_TEXTURE_ARRAY_INDEX,
         .bottomTexture = DIRT_TEXTURE_ARRAY_INDEX,
         .isRenderSolid = 1,
-        .blockBreakingTime = 100,
+        .blockBreakingTime = 1.0f,
         .isRenderCross = 0,
-        .isPhysicsSolid = 1
-    };
+        .isPhysicsSolid = 1};
 
     blockRegistry[BLOCK_TYPE_DIRT] = (BlockType){
         .id = BLOCK_TYPE_DIRT,
@@ -292,10 +299,9 @@ void initGraphics()
         .topTexture = DIRT_TEXTURE_ARRAY_INDEX,
         .bottomTexture = DIRT_TEXTURE_ARRAY_INDEX,
         .isRenderSolid = 1,
-        .blockBreakingTime = 100,
+        .blockBreakingTime = 1.0f,
         .isRenderCross = 0,
-        .isPhysicsSolid = 1
-    };
+        .isPhysicsSolid = 1};
 
     blockRegistry[BLOCK_TYPE_STONE] = (BlockType){
         .id = BLOCK_TYPE_STONE,
@@ -303,10 +309,9 @@ void initGraphics()
         .topTexture = STONE_TEXTURE_ARRAY_INDEX,
         .bottomTexture = STONE_TEXTURE_ARRAY_INDEX,
         .isRenderSolid = 1,
-        .blockBreakingTime = 200,
+        .blockBreakingTime = 2.0f,
         .isRenderCross = 0,
-        .isPhysicsSolid = 1
-    };
+        .isPhysicsSolid = 1};
 
     blockRegistry[BLOCK_TYPE_WATER] = (BlockType){
         .id = BLOCK_TYPE_WATER,
@@ -314,22 +319,19 @@ void initGraphics()
         .topTexture = WATER_TEXTURE_ARRAY_INDEX,
         .bottomTexture = WATER_TEXTURE_ARRAY_INDEX,
         .isRenderSolid = 0,
-        .blockBreakingTime = 99999,
+        .blockBreakingTime = 99999.0f,
         .isRenderCross = 0,
-        .isPhysicsSolid = 0
-    };
-    
+        .isPhysicsSolid = 0};
+
     blockRegistry[BLOCK_TYPE_SAND] = (BlockType){
         .id = BLOCK_TYPE_SAND,
         .sideTexture = SAND_TEXTURE_ARRAY_INDEX,
         .topTexture = SAND_TEXTURE_ARRAY_INDEX,
         .bottomTexture = SAND_TEXTURE_ARRAY_INDEX,
         .isRenderSolid = 1,
-        .blockBreakingTime = 75,
+        .blockBreakingTime = 0.75f,
         .isRenderCross = 0,
-        .isPhysicsSolid = 1
-    };
-
+        .isPhysicsSolid = 1};
 
     blockRegistry[BLOCK_TYPE_OAK] = (BlockType){
         .id = BLOCK_TYPE_OAK,
@@ -337,10 +339,9 @@ void initGraphics()
         .topTexture = OAK_TOP_TEXTURE_ARRAY_INDEX,
         .bottomTexture = OAK_TOP_TEXTURE_ARRAY_INDEX,
         .isRenderSolid = 1,
-        .blockBreakingTime = 150,
+        .blockBreakingTime = 1.5f,
         .isRenderCross = 0,
-        .isPhysicsSolid = 1
-    };
+        .isPhysicsSolid = 1};
 
     blockRegistry[BLOCK_TYPE_LEAVES] = (BlockType){
         .id = BLOCK_TYPE_LEAVES,
@@ -348,10 +349,9 @@ void initGraphics()
         .topTexture = LEAVES_TEXTURE_ARRAY_INDEX,
         .bottomTexture = LEAVES_TEXTURE_ARRAY_INDEX,
         .isRenderSolid = 0,
-        .blockBreakingTime = 50,
+        .blockBreakingTime = 0.5f,
         .isRenderCross = 0,
-        .isPhysicsSolid = 1
-    };
+        .isPhysicsSolid = 1};
 
     blockRegistry[BLOCK_TYPE_ORCHID] = (BlockType){
         .id = BLOCK_TYPE_ORCHID,
@@ -359,10 +359,9 @@ void initGraphics()
         .topTexture = ORCHID_TEXTURE_ARRAY_INDEX,
         .bottomTexture = ORCHID_TEXTURE_ARRAY_INDEX,
         .isRenderSolid = 0,
-        .blockBreakingTime = 10,
+        .blockBreakingTime = 0.1f,
         .isRenderCross = 1,
-        .isPhysicsSolid = 0
-    };
+        .isPhysicsSolid = 0};
 
     blockRegistry[BLOCK_TYPE_SHORT_GRASS] = (BlockType){
         .id = BLOCK_TYPE_SHORT_GRASS,
@@ -370,12 +369,11 @@ void initGraphics()
         .topTexture = SHORT_GRASS_TEXTURE_ARRAY_INDEX,
         .bottomTexture = SHORT_GRASS_TEXTURE_ARRAY_INDEX,
         .isRenderSolid = 0,
-        .blockBreakingTime = 10,
+        .blockBreakingTime = 0.1f,
         .isRenderCross = 1,
-        .isPhysicsSolid = 0
-    };
+        .isPhysicsSolid = 0};
 
-    blockTextureArray = loadTextureArray(blockTextures, sizeof(blockTextures)/sizeof(blockTextures[0]));
+    blockTextureArray = loadTextureArray(blockTextures, sizeof(blockTextures) / sizeof(blockTextures[0]));
 }
 
 void reshape(int width, int height)
@@ -475,7 +473,7 @@ void face(
 
     if ((int)texture == BLOCK_TYPE_SELECT)
     {
-        
+
         // simple block outline, not a block breaking animation
 
         glDisable(GL_TEXTURE_2D);
@@ -489,10 +487,10 @@ void face(
         glColor4f(0.3f, 0.3f, 0.3f, 0.1f); // gray with 40% transparency
 
         glBegin(GL_QUADS);
-            glVertex3fv(vA);
-            glVertex3fv(vB);
-            glVertex3fv(vC);
-            glVertex3fv(vD);
+        glVertex3fv(vA);
+        glVertex3fv(vB);
+        glVertex3fv(vC);
+        glVertex3fv(vD);
         glEnd();
 
         glDisable(GL_POLYGON_OFFSET_FILL);
@@ -502,12 +500,12 @@ void face(
         glDisable(GL_BLEND);
 
         glPopMatrix();
-        
+
         ///////////////////////////
 
         glPushMatrix();
         glTranslatef(transformation[0], transformation[1], transformation[2]);
-        glScalef(BlockWidthX+0.01, BlockHeightY+0.01, BlockLengthZ+0.01);
+        glScalef(BlockWidthX + 0.01, BlockHeightY + 0.01, BlockLengthZ + 0.01);
 
         glDisable(GL_TEXTURE_2D);
         glDisable(GL_CULL_FACE);
@@ -517,7 +515,6 @@ void face(
 
         glDepthMask(GL_FALSE);
 
-
         glEnable(GL_LINE_SMOOTH);
         glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
 
@@ -525,33 +522,37 @@ void face(
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
         // Slightly expand the quad outward
-        float expand = 1.f;  // 1% larger
+        float expand = 1.f; // 1% larger
 
         GLfloat center[3] = {
             (vA[0] + vC[0]) * 0.5f,
             (vA[1] + vC[1]) * 0.5f,
-            (vA[2] + vC[2]) * 0.5f
-        };
+            (vA[2] + vC[2]) * 0.5f};
 
         GLfloat eA[3], eB[3], eC[3], eD[3];
 
-        for (int i = 0; i < 3; i++) {
+        for (int i = 0; i < 3; i++)
+        {
             eA[i] = center[i] + (vA[i] - center[i]) * expand;
             eB[i] = center[i] + (vB[i] - center[i]) * expand;
             eC[i] = center[i] + (vC[i] - center[i]) * expand;
             eD[i] = center[i] + (vD[i] - center[i]) * expand;
         }
 
-        glLineWidth(2.0f);   // keep it 1px
+        glLineWidth(2.0f); // keep it 1px
         glColor4f(0.0f, 0.0f, 0.0f, 1.0f);
 
-        glDepthMask(GL_FALSE);   // draw on top but respect depth
+        glDepthMask(GL_FALSE); // draw on top but respect depth
 
         glBegin(GL_LINES);
-            glVertex3fv(eA); glVertex3fv(eB);
-            glVertex3fv(eB); glVertex3fv(eC);
-            glVertex3fv(eC); glVertex3fv(eD);
-            glVertex3fv(eD); glVertex3fv(eA);
+        glVertex3fv(eA);
+        glVertex3fv(eB);
+        glVertex3fv(eB);
+        glVertex3fv(eC);
+        glVertex3fv(eC);
+        glVertex3fv(eD);
+        glVertex3fv(eD);
+        glVertex3fv(eA);
         glEnd();
 
         glDepthMask(GL_TRUE);
@@ -568,13 +569,16 @@ void face(
         glDisable(GL_BLEND);
         glPopMatrix();
 
-        if (userBlockBreakingTimeElapsed == 0) {glDepthMask(GL_TRUE); return;}
+        if (userBlockBreakingTimeElapsed == -1.f)
+        {
+            glDepthMask(GL_TRUE);
+            return;
+        }
         glPushMatrix();
         glTranslatef(transformation[0], transformation[1], transformation[2]);
         glScalef(BlockWidthX, BlockHeightY, BlockLengthZ);
 
-
-        int stage = 9 * ((float)userBlockBreakingTimeElapsed / blockRegistry[beginBlockBreakingBlockType].blockBreakingTime);
+        int stage = 9 * (userBlockBreakingTimeElapsed / blockRegistry[beginBlockBreakingBlockType].blockBreakingTime);
         if (stage > 8)
             stage = 8;
 
@@ -587,7 +591,7 @@ void face(
 
         // float crackAlpha = (stage / 9.0f);
         // crackAlpha = (crackAlpha > 1.0f) ? 1.0f : crackAlpha;
-        float crackAlpha = ((!blockRegistry[selectedBlockToRender.chunk->blocks[(int)selectedBlockToRender.localX + (int)(selectedBlockToRender.localZ*ChunkWidthX) + (int)(selectedBlockToRender.localY*ChunkLengthZ*ChunkWidthX)].blockType].isRenderSolid || selectedBlockToRender.chunk->blocks[(int)selectedBlockToRender.localX + (int)(selectedBlockToRender.localZ*ChunkWidthX) + (int)(selectedBlockToRender.localY*ChunkLengthZ*ChunkWidthX)].blockType == BLOCK_TYPE_SAND) ? 0.3 : 0.6);
+        float crackAlpha = ((!blockRegistry[selectedBlockToRender.chunk->blocks[(int)selectedBlockToRender.localX + (int)(selectedBlockToRender.localZ * ChunkWidthX) + (int)(selectedBlockToRender.localY * ChunkLengthZ * ChunkWidthX)].blockType].isRenderSolid || selectedBlockToRender.chunk->blocks[(int)selectedBlockToRender.localX + (int)(selectedBlockToRender.localZ * ChunkWidthX) + (int)(selectedBlockToRender.localY * ChunkLengthZ * ChunkWidthX)].blockType == BLOCK_TYPE_SAND) ? 0.3 : 0.6);
         glColor4f(1.0f, 1.0f, 1.0f, crackAlpha);
 
         // Compute face normal from vertices
@@ -731,17 +735,20 @@ void drawText(const char *text, float x, float y)
     }
 }
 
-void checkForWorldChunkVerticesDeletion() {
+void checkForWorldChunkVerticesDeletion()
+{
     int changedVBO = 0;
-    for (int loadedChunkIdx = 0; loadedChunkIdx < chunkLoaderManager.loadedChunks.amtLoadedChunks; loadedChunkIdx++) {
+    for (int loadedChunkIdx = 0; loadedChunkIdx < chunkLoaderManager.loadedChunks.amtLoadedChunks; loadedChunkIdx++)
+    {
         Chunk *loadedChunk = (chunkLoaderManager.loadedChunks.loadedChunks[loadedChunkIdx]);
 
-        if (loadedChunk->triggerVertexDeletion) {
+        if (loadedChunk->triggerVertexDeletion)
+        {
             loadedChunk->triggerVertexDeletion = 0;
-            
 
             int amtVerticesInChunk = loadedChunk->lastVertex - loadedChunk->firstVertex + 1;
-            if (loadedChunk->lastVertex != -1) {
+            if (loadedChunk->lastVertex != -1)
+            {
                 int start = loadedChunk->firstVertex;
                 int end = loadedChunk->lastVertex + 1;
 
@@ -753,13 +760,14 @@ void checkForWorldChunkVerticesDeletion() {
                             &worldVertices[end],
                             moveCount * sizeof(Vertex));
                 }
-                
+
                 worldVertexCount -= amtVerticesInChunk;
                 changedVBO = 1;
             }
 
             int amtWaterVerticesInChunk = loadedChunk->lastWaterVertex - loadedChunk->firstWaterVertex + 1;
-            if (loadedChunk->lastWaterVertex != -1) {
+            if (loadedChunk->lastWaterVertex != -1)
+            {
                 int start = loadedChunk->firstWaterVertex;
                 int end = loadedChunk->lastWaterVertex + 1;
 
@@ -776,37 +784,38 @@ void checkForWorldChunkVerticesDeletion() {
                 changedVBO = 1;
             }
 
-
-
-            
-
-            for (int otherChunkIdx = 0; otherChunkIdx < chunkLoaderManager.loadedChunks.amtLoadedChunks; otherChunkIdx++) {
+            for (int otherChunkIdx = 0; otherChunkIdx < chunkLoaderManager.loadedChunks.amtLoadedChunks; otherChunkIdx++)
+            {
                 Chunk *otherChunk = (chunkLoaderManager.loadedChunks.loadedChunks[otherChunkIdx]);
-                if (otherChunk->hasVertices && otherChunk->lastVertex != -1 && loadedChunk->lastVertex != -1) {
-                    if (otherChunk->firstVertex > loadedChunk->firstVertex) {
+                if (otherChunk->hasVertices && otherChunk->lastVertex != -1 && loadedChunk->lastVertex != -1)
+                {
+                    if (otherChunk->firstVertex > loadedChunk->firstVertex)
+                    {
                         otherChunk->firstVertex -= amtVerticesInChunk;
-                        otherChunk->lastVertex  -= amtVerticesInChunk;
+                        otherChunk->lastVertex -= amtVerticesInChunk;
                     }
                 }
-                if (otherChunk->hasWaterVertices && otherChunk->lastWaterVertex != -1 && loadedChunk->lastWaterVertex != -1) {
-                    if (otherChunk->firstWaterVertex > loadedChunk->firstWaterVertex) {
+                if (otherChunk->hasWaterVertices && otherChunk->lastWaterVertex != -1 && loadedChunk->lastWaterVertex != -1)
+                {
+                    if (otherChunk->firstWaterVertex > loadedChunk->firstWaterVertex)
+                    {
                         otherChunk->firstWaterVertex -= amtWaterVerticesInChunk;
-                        otherChunk->lastWaterVertex  -= amtWaterVerticesInChunk;
+                        otherChunk->lastWaterVertex -= amtWaterVerticesInChunk;
                     }
                 }
             }
 
             loadedChunk->firstVertex = -1;
-            loadedChunk->lastVertex  = -1;
+            loadedChunk->lastVertex = -1;
             loadedChunk->firstWaterVertex = -1;
-            loadedChunk->lastWaterVertex  = -1;
+            loadedChunk->lastWaterVertex = -1;
             loadedChunk->hasVertices = 0;
             loadedChunk->hasWaterVertices = 0;
         }
     }
-    
-    
-    if (changedVBO) {
+
+    if (changedVBO)
+    {
         uploadWorldMesh();
     }
 }
@@ -816,10 +825,12 @@ void buildWorldMesh()
     checkForWorldChunkVerticesDeletion();
 
     int changedVBO = 0;
-    for (int renderChunkIdx = 0; renderChunkIdx < chunkLoaderManager.renderChunks.amtRenderChunks; renderChunkIdx++) {
-         Chunk *renderChunk = (chunkLoaderManager.renderChunks.renderChunks[renderChunkIdx]);
+    for (int renderChunkIdx = 0; renderChunkIdx < chunkLoaderManager.renderChunks.amtRenderChunks; renderChunkIdx++)
+    {
+        Chunk *renderChunk = (chunkLoaderManager.renderChunks.renderChunks[renderChunkIdx]);
 
-         if (!renderChunk->hasVertices && renderChunk->hasMesh) {
+        if (!renderChunk->hasVertices && renderChunk->hasMesh)
+        {
             renderChunk->hasVertices = 1;
             renderChunk->hasWaterVertices = 0;
             renderChunk->triggerVertexDeletion = 0;
@@ -828,17 +839,21 @@ void buildWorldMesh()
             int lastQuadIndex = renderChunk->lastQuadIndex;
 
             renderChunk->firstVertex = worldVertexCount;
-            for (int i = firstQuadIndex; i < (lastQuadIndex+1); i++)
+            for (int i = firstQuadIndex; i < (lastQuadIndex + 1); i++)
             {
                 MeshQuad *q = &chunkMeshQuads.quads[i];
-                if (q->blockType == BLOCK_TYPE_WATER) { 
+                if (q->blockType == BLOCK_TYPE_WATER)
+                {
                     continue;
                 }
 
-                if (worldVertices == NULL) {
+                if (worldVertices == NULL)
+                {
                     worldVertexCapacity = 1024;
                     worldVertices = malloc(sizeof(Vertex) * worldVertexCapacity);
-                } else {
+                }
+                else
+                {
                     if ((worldVertexCount + 6) > worldVertexCapacity)
                     {
                         worldVertexCapacity = worldVertexCapacity * 2 + 1024;
@@ -867,118 +882,118 @@ void buildWorldMesh()
                     {-0.5, -0.5, -0.5},
                 };
 
-              
-                switch(q->faceType)
+                switch (q->faceType)
                 {
-                    case FACE_FRONT:
-                        v0 = (Vertex){Vertices[0][0], Vertices[0][1], Vertices[0][2], 0, 0};
-                        v1 = (Vertex){Vertices[1][0], Vertices[1][1], Vertices[1][2], w, 0};
-                        v2 = (Vertex){Vertices[2][0], Vertices[2][1], Vertices[2][2], w, h};
-                        v3 = (Vertex){Vertices[3][0], Vertices[3][1], Vertices[3][2], 0, h};
-                        break;
+                case FACE_FRONT:
+                    v0 = (Vertex){Vertices[0][0], Vertices[0][1], Vertices[0][2], 0, 0};
+                    v1 = (Vertex){Vertices[1][0], Vertices[1][1], Vertices[1][2], w, 0};
+                    v2 = (Vertex){Vertices[2][0], Vertices[2][1], Vertices[2][2], w, h};
+                    v3 = (Vertex){Vertices[3][0], Vertices[3][1], Vertices[3][2], 0, h};
+                    break;
 
-                    case FACE_BACK:
-                        v0 = (Vertex){Vertices[5][0], Vertices[5][1], Vertices[5][2], 0, 0};
-                        v1 = (Vertex){Vertices[4][0], Vertices[4][1], Vertices[4][2], w, 0};
-                        v2 = (Vertex){Vertices[7][0], Vertices[7][1], Vertices[7][2], w, h};
-                        v3 = (Vertex){Vertices[6][0], Vertices[6][1], Vertices[6][2], 0, h};
-                        break;
+                case FACE_BACK:
+                    v0 = (Vertex){Vertices[5][0], Vertices[5][1], Vertices[5][2], 0, 0};
+                    v1 = (Vertex){Vertices[4][0], Vertices[4][1], Vertices[4][2], w, 0};
+                    v2 = (Vertex){Vertices[7][0], Vertices[7][1], Vertices[7][2], w, h};
+                    v3 = (Vertex){Vertices[6][0], Vertices[6][1], Vertices[6][2], 0, h};
+                    break;
 
-                    case FACE_LEFT:
-                        v0 = (Vertex){Vertices[7][0], Vertices[7][1], Vertices[7][2], 0, 0};
-                        v1 = (Vertex){Vertices[3][0], Vertices[3][1], Vertices[3][2], w, 0};
-                        v2 = (Vertex){Vertices[0][0], Vertices[0][1], Vertices[0][2], w, h};
-                        v3 = (Vertex){Vertices[4][0], Vertices[4][1], Vertices[4][2], 0, h};
-                        break;
+                case FACE_LEFT:
+                    v0 = (Vertex){Vertices[7][0], Vertices[7][1], Vertices[7][2], 0, 0};
+                    v1 = (Vertex){Vertices[3][0], Vertices[3][1], Vertices[3][2], w, 0};
+                    v2 = (Vertex){Vertices[0][0], Vertices[0][1], Vertices[0][2], w, h};
+                    v3 = (Vertex){Vertices[4][0], Vertices[4][1], Vertices[4][2], 0, h};
+                    break;
 
-                    case FACE_RIGHT:
-                        v0 = (Vertex){Vertices[2][0], Vertices[2][1], Vertices[2][2], 0, 0};
-                        v1 = (Vertex){Vertices[6][0], Vertices[6][1], Vertices[6][2], w, 0};
-                        v2 = (Vertex){Vertices[5][0], Vertices[5][1], Vertices[5][2], w, h};
-                        v3 = (Vertex){Vertices[1][0], Vertices[1][1], Vertices[1][2], 0, h};
-                        break;
-                    case FACE_TOP:
-                        v0 = (Vertex){Vertices[0][0], Vertices[0][1], Vertices[0][2], 0, 0};
-                        v1 = (Vertex){Vertices[1][0], Vertices[1][1], Vertices[1][2], w, 0};
-                        v2 = (Vertex){Vertices[5][0], Vertices[5][1], Vertices[5][2], w, h};
-                        v3 = (Vertex){Vertices[4][0], Vertices[4][1], Vertices[4][2], 0, h};
-                        break;
+                case FACE_RIGHT:
+                    v0 = (Vertex){Vertices[2][0], Vertices[2][1], Vertices[2][2], 0, 0};
+                    v1 = (Vertex){Vertices[6][0], Vertices[6][1], Vertices[6][2], w, 0};
+                    v2 = (Vertex){Vertices[5][0], Vertices[5][1], Vertices[5][2], w, h};
+                    v3 = (Vertex){Vertices[1][0], Vertices[1][1], Vertices[1][2], 0, h};
+                    break;
+                case FACE_TOP:
+                    v0 = (Vertex){Vertices[0][0], Vertices[0][1], Vertices[0][2], 0, 0};
+                    v1 = (Vertex){Vertices[1][0], Vertices[1][1], Vertices[1][2], w, 0};
+                    v2 = (Vertex){Vertices[5][0], Vertices[5][1], Vertices[5][2], w, h};
+                    v3 = (Vertex){Vertices[4][0], Vertices[4][1], Vertices[4][2], 0, h};
+                    break;
 
-                    case FACE_BOTTOM:
-                        v0 = (Vertex){Vertices[7][0], Vertices[7][1], Vertices[7][2], 0, 0};
-                        v1 = (Vertex){Vertices[6][0], Vertices[6][1], Vertices[6][2], w, 0};
-                        v2 = (Vertex){Vertices[2][0], Vertices[2][1], Vertices[2][2], w, h};
-                        v3 = (Vertex){Vertices[3][0], Vertices[3][1], Vertices[3][2], 0, h};
-                        break;
+                case FACE_BOTTOM:
+                    v0 = (Vertex){Vertices[7][0], Vertices[7][1], Vertices[7][2], 0, 0};
+                    v1 = (Vertex){Vertices[6][0], Vertices[6][1], Vertices[6][2], w, 0};
+                    v2 = (Vertex){Vertices[2][0], Vertices[2][1], Vertices[2][2], w, h};
+                    v3 = (Vertex){Vertices[3][0], Vertices[3][1], Vertices[3][2], 0, h};
+                    break;
 
-                    case FACE_CROSS:
-                        {
-                            Vertex c0 = (Vertex){-0.5f, -0.5f, -0.5f, 0, 1};
-                            Vertex c1 = (Vertex){ 0.5f, -0.5f,  0.5f, 1, 1};
-                            Vertex c2 = (Vertex){ 0.5f,  0.5f,  0.5f, 1, 0};
-                            Vertex c3 = (Vertex){-0.5f,  0.5f, -0.5f, 0, 0};
+                case FACE_CROSS:
+                {
+                    Vertex c0 = (Vertex){-0.5f, -0.5f, -0.5f, 0, 1};
+                    Vertex c1 = (Vertex){0.5f, -0.5f, 0.5f, 1, 1};
+                    Vertex c2 = (Vertex){0.5f, 0.5f, 0.5f, 1, 0};
+                    Vertex c3 = (Vertex){-0.5f, 0.5f, -0.5f, 0, 0};
 
-                            Vertex d0 = (Vertex){-0.5f, -0.5f,  0.5f, 0, 1};
-                            Vertex d1 = (Vertex){ 0.5f, -0.5f, -0.5f, 1, 1};
-                            Vertex d2 = (Vertex){ 0.5f,  0.5f, -0.5f, 1, 0};
-                            Vertex d3 = (Vertex){-0.5f,  0.5f,  0.5f, 0, 0};
+                    Vertex d0 = (Vertex){-0.5f, -0.5f, 0.5f, 0, 1};
+                    Vertex d1 = (Vertex){0.5f, -0.5f, -0.5f, 1, 1};
+                    Vertex d2 = (Vertex){0.5f, 0.5f, -0.5f, 1, 0};
+                    Vertex d3 = (Vertex){-0.5f, 0.5f, 0.5f, 0, 0};
 
-                            Vertex* verts[8] = {&c0,&c1,&c2,&c3,&d0,&d1,&d2,&d3};
-                            for (int i = 0; i < 8; i++) {
-                                verts[i]->x += x;
-                                verts[i]->y += y;
-                                verts[i]->z += z;
-                                verts[i]->layer = blockRegistry[q->blockType].sideTexture;
-                            }
+                    Vertex *verts[8] = {&c0, &c1, &c2, &c3, &d0, &d1, &d2, &d3};
+                    for (int i = 0; i < 8; i++)
+                    {
+                        verts[i]->x += x;
+                        verts[i]->y += y;
+                        verts[i]->z += z;
+                        verts[i]->layer = blockRegistry[q->blockType].sideTexture;
+                    }
 
-                            if ((worldVertexCount + 24) > worldVertexCapacity) {
-                                worldVertexCapacity = worldVertexCapacity * 2 + 1024;
-                                worldVertices = realloc(worldVertices, sizeof(Vertex) * worldVertexCapacity);
-                            }
+                    if ((worldVertexCount + 24) > worldVertexCapacity)
+                    {
+                        worldVertexCapacity = worldVertexCapacity * 2 + 1024;
+                        worldVertices = realloc(worldVertices, sizeof(Vertex) * worldVertexCapacity);
+                    }
 
-                            // FRONT
-                            worldVertices[worldVertexCount++] = c0;
-                            worldVertices[worldVertexCount++] = c1;
-                            worldVertices[worldVertexCount++] = c2;
-                            worldVertices[worldVertexCount++] = c0;
-                            worldVertices[worldVertexCount++] = c2;
-                            worldVertices[worldVertexCount++] = c3;
+                    // FRONT
+                    worldVertices[worldVertexCount++] = c0;
+                    worldVertices[worldVertexCount++] = c1;
+                    worldVertices[worldVertexCount++] = c2;
+                    worldVertices[worldVertexCount++] = c0;
+                    worldVertices[worldVertexCount++] = c2;
+                    worldVertices[worldVertexCount++] = c3;
 
-                            // BACK
-                            worldVertices[worldVertexCount++] = c2;
-                            worldVertices[worldVertexCount++] = c1;
-                            worldVertices[worldVertexCount++] = c0;
-                            worldVertices[worldVertexCount++] = c3;
-                            worldVertices[worldVertexCount++] = c2;
-                            worldVertices[worldVertexCount++] = c0;
+                    // BACK
+                    worldVertices[worldVertexCount++] = c2;
+                    worldVertices[worldVertexCount++] = c1;
+                    worldVertices[worldVertexCount++] = c0;
+                    worldVertices[worldVertexCount++] = c3;
+                    worldVertices[worldVertexCount++] = c2;
+                    worldVertices[worldVertexCount++] = c0;
 
-                   
-                            // FRONT
-                            worldVertices[worldVertexCount++] = d0;
-                            worldVertices[worldVertexCount++] = d1;
-                            worldVertices[worldVertexCount++] = d2;
-                            worldVertices[worldVertexCount++] = d0;
-                            worldVertices[worldVertexCount++] = d2;
-                            worldVertices[worldVertexCount++] = d3;
+                    // FRONT
+                    worldVertices[worldVertexCount++] = d0;
+                    worldVertices[worldVertexCount++] = d1;
+                    worldVertices[worldVertexCount++] = d2;
+                    worldVertices[worldVertexCount++] = d0;
+                    worldVertices[worldVertexCount++] = d2;
+                    worldVertices[worldVertexCount++] = d3;
 
-                            // BACK
-                            worldVertices[worldVertexCount++] = d2;
-                            worldVertices[worldVertexCount++] = d1;
-                            worldVertices[worldVertexCount++] = d0;
-                            worldVertices[worldVertexCount++] = d3;
-                            worldVertices[worldVertexCount++] = d2;
-                            worldVertices[worldVertexCount++] = d0;
+                    // BACK
+                    worldVertices[worldVertexCount++] = d2;
+                    worldVertices[worldVertexCount++] = d1;
+                    worldVertices[worldVertexCount++] = d0;
+                    worldVertices[worldVertexCount++] = d3;
+                    worldVertices[worldVertexCount++] = d2;
+                    worldVertices[worldVertexCount++] = d0;
 
-                            continue; 
-                        }
+                    continue;
+                }
                 }
 
-                float minX = MIN4(v0.x,v1.x, v2.x, v3.x);
-                float maxX = MAX4(v0.x,v1.x, v2.x, v3.x);
-                float minY = MIN4(v0.y,v1.y, v2.y, v3.y);
-                float maxY = MAX4(v0.y,v1.y, v2.y, v3.y);
-                float minZ = MIN4(v0.z,v1.z, v2.z, v3.z);
-                float maxZ = MAX4(v0.z,v1.z, v2.z, v3.z);
+                float minX = MIN4(v0.x, v1.x, v2.x, v3.x);
+                float maxX = MAX4(v0.x, v1.x, v2.x, v3.x);
+                float minY = MIN4(v0.y, v1.y, v2.y, v3.y);
+                float maxY = MAX4(v0.y, v1.y, v2.y, v3.y);
+                float minZ = MIN4(v0.z, v1.z, v2.z, v3.z);
+                float maxZ = MAX4(v0.z, v1.z, v2.z, v3.z);
 
                 float amtDx = maxX - minX;
                 float amtDy = maxY - minY;
@@ -991,9 +1006,6 @@ void buildWorldMesh()
                 int topTextureIndex = blockRegistry[q->blockType].topTexture;
                 int bottomTextureIndex = blockRegistry[q->blockType].bottomTexture;
 
-                
-
-
                 if (amtDy == 0.0f)
                 {
                     // X–Z face
@@ -1005,13 +1017,11 @@ void buildWorldMesh()
                         v->x = (v->x + 0.5f) * size[0] - 0.5f;
                         v->z = (v->z + 0.5f) * size[1] - 0.5f;
 
-
                         v->u = v->x + 0.5f;
                         v->v = v->z + 0.5f;
 
-                        v->layer = (q->faceType == FACE_TOP) ? topTextureIndex : bottomTextureIndex;          
+                        v->layer = (q->faceType == FACE_TOP) ? topTextureIndex : bottomTextureIndex;
                     }
-
                 }
                 else if (amtDx == 0.0f)
                 {
@@ -1019,15 +1029,15 @@ void buildWorldMesh()
                     for (int i = 0; i < 4; i++)
                     {
                         Vertex *v = (i == 0 ? &v0 : i == 1 ? &v1
-                        : i == 2   ? &v2
-                                   : &v3);
+                                                : i == 2   ? &v2
+                                                           : &v3);
                         v->y = (v->y + 0.5f) * size[0] - 0.5f;
                         v->z = (v->z + 0.5f) * size[1] - 0.5f;
 
                         v->u = v->z + 0.5f;
                         v->v = 1.0 - (v->y + 0.5f);
 
-                        v->layer = sideTextureIndex;  
+                        v->layer = sideTextureIndex;
                     }
                 }
                 else
@@ -1036,24 +1046,23 @@ void buildWorldMesh()
                     for (int i = 0; i < 4; i++)
                     {
                         Vertex *v = (i == 0 ? &v0 : i == 1 ? &v1
-                        : i == 2   ? &v2
-                                   : &v3);
+                                                : i == 2   ? &v2
+                                                           : &v3);
                         v->x = (v->x + 0.5f) * size[0] - 0.5f;
                         v->y = (v->y + 0.5f) * size[1] - 0.5f;
 
                         v->u = v->x + 0.5f;
                         v->v = 1.0 - (v->y + 0.5f);
 
-                        v->layer = sideTextureIndex; 
-                    } 
+                        v->layer = sideTextureIndex;
+                    }
                 }
-
 
                 for (int i = 0; i < 4; i++)
                 {
                     Vertex *v = (i == 0 ? &v0 : i == 1 ? &v1
-                    : i == 2   ? &v2
-                               : &v3);
+                                            : i == 2   ? &v2
+                                                       : &v3);
 
                     v->x += x;
                     v->y += y;
@@ -1067,232 +1076,228 @@ void buildWorldMesh()
                 worldVertices[worldVertexCount++] = v2;
                 worldVertices[worldVertexCount++] = v3;
             }
-            renderChunk->lastVertex = worldVertexCount-1;
+            renderChunk->lastVertex = worldVertexCount - 1;
 
             changedVBO = 1;
-         }
+        }
 
-         if (!renderChunk->hasWaterVertices && renderChunk->hasMesh) {
-             renderChunk->hasWaterVertices = 1;
-             renderChunk->triggerVertexDeletion = 0;
+        if (!renderChunk->hasWaterVertices && renderChunk->hasMesh)
+        {
+            renderChunk->hasWaterVertices = 1;
+            renderChunk->triggerVertexDeletion = 0;
 
-             int firstQuadIndex = renderChunk->firstQuadIndex;
-             int lastQuadIndex = renderChunk->lastQuadIndex;
+            int firstQuadIndex = renderChunk->firstQuadIndex;
+            int lastQuadIndex = renderChunk->lastQuadIndex;
 
+            renderChunk->firstWaterVertex = waterVertexCount;
+            for (int i = firstQuadIndex; i < (lastQuadIndex + 1); i++)
+            {
+                MeshQuad *q = &chunkMeshQuads.quads[i];
+                if (q->blockType != BLOCK_TYPE_WATER)
+                {
+                    continue;
+                }
 
-             
+                if ((q->y < (float)SEA_LEVEL - 1))
+                {
+                    continue;
+                }
 
-             renderChunk->firstWaterVertex = waterVertexCount;
-             for (int i = firstQuadIndex; i < (lastQuadIndex+1); i++)
-             {
-                 MeshQuad *q = &chunkMeshQuads.quads[i];
-                 if (q->blockType != BLOCK_TYPE_WATER) { 
-                     continue;
-                 }
+                if (waterVertices == NULL)
+                {
+                    waterVertexCapacity = 1024;
+                    waterVertices = malloc(sizeof(Vertex) * waterVertexCapacity);
+                }
+                else
+                {
+                    if (waterVertexCount + 6 > waterVertexCapacity)
+                    {
+                        waterVertexCapacity = waterVertexCapacity * 2 + 1024;
+                        waterVertices = realloc(waterVertices, sizeof(Vertex) * waterVertexCapacity);
+                    }
+                }
 
-                 if ((q->y < (float)SEA_LEVEL-1)) {
-                     continue;
-                  }
+                float x = q->x;
+                float y = q->y;
+                float z = q->z;
 
-                 if (waterVertices == NULL) {
-                     waterVertexCapacity = 1024;
-                     waterVertices = malloc(sizeof(Vertex) * waterVertexCapacity);
-                 } else {
-                     if (waterVertexCount + 6 > waterVertexCapacity)
-                     {
-                         waterVertexCapacity = waterVertexCapacity * 2 + 1024;
-                         waterVertices = realloc(waterVertices, sizeof(Vertex) * waterVertexCapacity);
-                     }
-                 }
-                
-                 float x = q->x;
-                 float y = q->y;
-                 float z = q->z;
+                float w = q->width;
+                float h = q->height;
 
-                 float w = q->width;
-                 float h = q->height;
+                Vertex v0, v1, v2, v3;
+                GLfloat Vertices[8][3] = {
+                    // front face
+                    {-0.5, 0.5, 0.5},
+                    {0.5, 0.5, 0.5},
+                    {0.5, -0.5, 0.5},
+                    {-0.5, -0.5, 0.5},
+                    // back face
+                    {-0.5, 0.5, -0.5},
+                    {0.5, 0.5, -0.5},
+                    {0.5, -0.5, -0.5},
+                    {-0.5, -0.5, -0.5},
+                };
 
-                 Vertex v0, v1, v2, v3;
-                 GLfloat Vertices[8][3] = {
-                     // front face
-                     {-0.5, 0.5, 0.5},
-                     {0.5, 0.5, 0.5},
-                     {0.5, -0.5, 0.5},
-                     {-0.5, -0.5, 0.5},
-                     // back face
-                     {-0.5, 0.5, -0.5},
-                     {0.5, 0.5, -0.5},
-                     {0.5, -0.5, -0.5},
-                     {-0.5, -0.5, -0.5},
-                 };
+                switch (q->faceType)
+                {
+                case FACE_FRONT:
+                    v0 = (Vertex){Vertices[0][0], Vertices[0][1], Vertices[0][2], 0, 0};
+                    v1 = (Vertex){Vertices[1][0], Vertices[1][1], Vertices[1][2], w, 0};
+                    v2 = (Vertex){Vertices[2][0], Vertices[2][1], Vertices[2][2], w, h};
+                    v3 = (Vertex){Vertices[3][0], Vertices[3][1], Vertices[3][2], 0, h};
+                    break;
 
-                 switch(q->faceType)
-                 {
-                     case FACE_FRONT:
-                         v0 = (Vertex){Vertices[0][0], Vertices[0][1], Vertices[0][2], 0, 0};
-                         v1 = (Vertex){Vertices[1][0], Vertices[1][1], Vertices[1][2], w, 0};
-                         v2 = (Vertex){Vertices[2][0], Vertices[2][1], Vertices[2][2], w, h};
-                         v3 = (Vertex){Vertices[3][0], Vertices[3][1], Vertices[3][2], 0, h};
-                         break;
+                case FACE_BACK:
+                    v0 = (Vertex){Vertices[5][0], Vertices[5][1], Vertices[5][2], 0, 0};
+                    v1 = (Vertex){Vertices[4][0], Vertices[4][1], Vertices[4][2], w, 0};
+                    v2 = (Vertex){Vertices[7][0], Vertices[7][1], Vertices[7][2], w, h};
+                    v3 = (Vertex){Vertices[6][0], Vertices[6][1], Vertices[6][2], 0, h};
+                    break;
 
-                     case FACE_BACK:
-                         v0 = (Vertex){Vertices[5][0], Vertices[5][1], Vertices[5][2], 0, 0};
-                         v1 = (Vertex){Vertices[4][0], Vertices[4][1], Vertices[4][2], w, 0};
-                         v2 = (Vertex){Vertices[7][0], Vertices[7][1], Vertices[7][2], w, h};
-                         v3 = (Vertex){Vertices[6][0], Vertices[6][1], Vertices[6][2], 0, h};
-                         break;
+                case FACE_LEFT:
+                    v0 = (Vertex){Vertices[7][0], Vertices[7][1], Vertices[7][2], 0, 0};
+                    v1 = (Vertex){Vertices[3][0], Vertices[3][1], Vertices[3][2], w, 0};
+                    v2 = (Vertex){Vertices[0][0], Vertices[0][1], Vertices[0][2], w, h};
+                    v3 = (Vertex){Vertices[4][0], Vertices[4][1], Vertices[4][2], 0, h};
+                    break;
 
-                     case FACE_LEFT:
-                         v0 = (Vertex){Vertices[7][0], Vertices[7][1], Vertices[7][2], 0, 0};
-                         v1 = (Vertex){Vertices[3][0], Vertices[3][1], Vertices[3][2], w, 0};
-                         v2 = (Vertex){Vertices[0][0], Vertices[0][1], Vertices[0][2], w, h};
-                         v3 = (Vertex){Vertices[4][0], Vertices[4][1], Vertices[4][2], 0, h};
-                         break;
+                case FACE_RIGHT:
+                    v0 = (Vertex){Vertices[2][0], Vertices[2][1], Vertices[2][2], 0, 0};
+                    v1 = (Vertex){Vertices[6][0], Vertices[6][1], Vertices[6][2], w, 0};
+                    v2 = (Vertex){Vertices[5][0], Vertices[5][1], Vertices[5][2], w, h};
+                    v3 = (Vertex){Vertices[1][0], Vertices[1][1], Vertices[1][2], 0, h};
+                    break;
+                case FACE_TOP:
+                    v0 = (Vertex){Vertices[0][0], Vertices[0][1], Vertices[0][2], 0, 0};
+                    v1 = (Vertex){Vertices[1][0], Vertices[1][1], Vertices[1][2], w, 0};
+                    v2 = (Vertex){Vertices[5][0], Vertices[5][1], Vertices[5][2], w, h};
+                    v3 = (Vertex){Vertices[4][0], Vertices[4][1], Vertices[4][2], 0, h};
+                    break;
 
-                     case FACE_RIGHT:
-                         v0 = (Vertex){Vertices[2][0], Vertices[2][1], Vertices[2][2], 0, 0};
-                         v1 = (Vertex){Vertices[6][0], Vertices[6][1], Vertices[6][2], w, 0};
-                         v2 = (Vertex){Vertices[5][0], Vertices[5][1], Vertices[5][2], w, h};
-                         v3 = (Vertex){Vertices[1][0], Vertices[1][1], Vertices[1][2], 0, h};
-                         break;
-                     case FACE_TOP:
-                         v0 = (Vertex){Vertices[0][0], Vertices[0][1], Vertices[0][2], 0, 0};
-                         v1 = (Vertex){Vertices[1][0], Vertices[1][1], Vertices[1][2], w, 0};
-                         v2 = (Vertex){Vertices[5][0], Vertices[5][1], Vertices[5][2], w, h};
-                         v3 = (Vertex){Vertices[4][0], Vertices[4][1], Vertices[4][2], 0, h};
-                         break;
+                case FACE_BOTTOM:
+                    v0 = (Vertex){Vertices[7][0], Vertices[7][1], Vertices[7][2], 0, 0};
+                    v1 = (Vertex){Vertices[6][0], Vertices[6][1], Vertices[6][2], w, 0};
+                    v2 = (Vertex){Vertices[2][0], Vertices[2][1], Vertices[2][2], w, h};
+                    v3 = (Vertex){Vertices[3][0], Vertices[3][1], Vertices[3][2], 0, h};
+                    break;
+                }
 
-                     case FACE_BOTTOM:
-                         v0 = (Vertex){Vertices[7][0], Vertices[7][1], Vertices[7][2], 0, 0};
-                         v1 = (Vertex){Vertices[6][0], Vertices[6][1], Vertices[6][2], w, 0};
-                         v2 = (Vertex){Vertices[2][0], Vertices[2][1], Vertices[2][2], w, h};
-                         v3 = (Vertex){Vertices[3][0], Vertices[3][1], Vertices[3][2], 0, h};
-                         break;
-                 }
+                float minX = MIN4(v0.x, v1.x, v2.x, v3.x);
+                float maxX = MAX4(v0.x, v1.x, v2.x, v3.x);
+                float minY = MIN4(v0.y, v1.y, v2.y, v3.y);
+                float maxY = MAX4(v0.y, v1.y, v2.y, v3.y);
+                float minZ = MIN4(v0.z, v1.z, v2.z, v3.z);
+                float maxZ = MAX4(v0.z, v1.z, v2.z, v3.z);
 
-                 float minX = MIN4(v0.x,v1.x, v2.x, v3.x);
-                 float maxX = MAX4(v0.x,v1.x, v2.x, v3.x);
-                 float minY = MIN4(v0.y,v1.y, v2.y, v3.y);
-                 float maxY = MAX4(v0.y,v1.y, v2.y, v3.y);
-                 float minZ = MIN4(v0.z,v1.z, v2.z, v3.z);
-                 float maxZ = MAX4(v0.z,v1.z, v2.z, v3.z);
+                float amtDx = maxX - minX;
+                float amtDy = maxY - minY;
+                float amtDz = maxZ - minZ;
 
-                 
+                float size[2] = {w, h};
+                // scale along face axes only
 
-                 float amtDx = maxX - minX;
-                 float amtDy = maxY - minY;
-                 float amtDz = maxZ - minZ;
+                int sideTextureIndex = blockRegistry[BLOCK_TYPE_WATER].sideTexture;
+                int topTextureIndex = blockRegistry[BLOCK_TYPE_WATER].sideTexture;
+                int bottomTextureIndex = blockRegistry[BLOCK_TYPE_WATER].sideTexture;
 
-                 float size[2] = {w, h};
-                 // scale along face axes only
+                if (amtDy == 0.0f)
+                {
+                    // X–Z face
+                    for (int i = 0; i < 4; i++)
+                    {
+                        Vertex *v = (i == 0 ? &v0 : i == 1 ? &v1
+                                                : i == 2   ? &v2
+                                                           : &v3);
+                        v->x = (v->x + 0.5f) * size[0] - 0.5f;
+                        v->z = (v->z + 0.5f) * size[1] - 0.5f;
 
-                 int sideTextureIndex   = blockRegistry[BLOCK_TYPE_WATER].sideTexture;
-                 int topTextureIndex    = blockRegistry[BLOCK_TYPE_WATER].sideTexture;
-                 int bottomTextureIndex = blockRegistry[BLOCK_TYPE_WATER].sideTexture;
+                        v->u = v->x + 0.5f;
+                        v->v = v->z + 0.5f;
 
-                 if (amtDy == 0.0f)
-                 {
-                     // X–Z face
-                     for (int i = 0; i < 4; i++)
-                     {
-                         Vertex *v = (i == 0 ? &v0 : i == 1 ? &v1
-                                                 : i == 2   ? &v2
-                                                            : &v3);
-                         v->x = (v->x + 0.5f) * size[0] - 0.5f;
-                         v->z = (v->z + 0.5f) * size[1] - 0.5f;
+                        v->layer = (q->faceType == FACE_TOP) ? topTextureIndex : bottomTextureIndex;
+                    }
+                }
+                else if (amtDx == 0.0f)
+                {
+                    // Y–Z face
+                    for (int i = 0; i < 4; i++)
+                    {
+                        Vertex *v = (i == 0 ? &v0 : i == 1 ? &v1
+                                                : i == 2   ? &v2
+                                                           : &v3);
+                        v->y = (v->y + 0.5f) * size[0] - 0.5f;
+                        v->z = (v->z + 0.5f) * size[1] - 0.5f;
 
+                        v->u = v->z + 0.5f;
+                        v->v = 1.0 - (v->y + 0.5f);
 
-                         v->u = v->x + 0.5f;
-                         v->v = v->z + 0.5f;
+                        v->layer = sideTextureIndex;
+                    }
+                }
+                else
+                {
+                    // X–Y face
+                    for (int i = 0; i < 4; i++)
+                    {
+                        Vertex *v = (i == 0 ? &v0 : i == 1 ? &v1
+                                                : i == 2   ? &v2
+                                                           : &v3);
+                        v->x = (v->x + 0.5f) * size[0] - 0.5f;
+                        v->y = (v->y + 0.5f) * size[1] - 0.5f;
 
-                         v->layer = (q->faceType == FACE_TOP) ? topTextureIndex : bottomTextureIndex;          
-                     }
+                        v->u = v->x + 0.5f;
+                        v->v = 1.0 - (v->y + 0.5f);
 
-                 }
-                 else if (amtDx == 0.0f)
-                 {
-                     // Y–Z face
-                     for (int i = 0; i < 4; i++)
-                     {
-                         Vertex *v = (i == 0 ? &v0 : i == 1 ? &v1
-                         : i == 2   ? &v2
-                                    : &v3);
-                         v->y = (v->y + 0.5f) * size[0] - 0.5f;
-                         v->z = (v->z + 0.5f) * size[1] - 0.5f;
+                        v->layer = sideTextureIndex;
+                    }
+                }
 
-                         v->u = v->z + 0.5f;
-                         v->v = 1.0 - (v->y + 0.5f);
+                for (int i = 0; i < 4; i++)
+                {
+                    Vertex *v = (i == 0 ? &v0 : i == 1 ? &v1
+                                            : i == 2   ? &v2
+                                                       : &v3);
 
-                         v->layer = sideTextureIndex;  
-                     }
-                 }
-                 else
-                 {
-                     // X–Y face
-                     for (int i = 0; i < 4; i++)
-                     {
-                         Vertex *v = (i == 0 ? &v0 : i == 1 ? &v1
-                         : i == 2   ? &v2
-                                    : &v3);
-                         v->x = (v->x + 0.5f) * size[0] - 0.5f;
-                         v->y = (v->y + 0.5f) * size[1] - 0.5f;
+                    v->x += x;
+                    v->y += y;
+                    v->z += z;
 
-                         v->u = v->x + 0.5f;
-                         v->v = 1.0 - (v->y + 0.5f);
+                    if (v->y > 0.0f) // top vertices of cube
+                    {
+                        v->y -= 0.1;
+                    }
+                }
 
-                         v->layer = sideTextureIndex; 
-                     } 
-                 }
+                waterVertices[waterVertexCount++] = v0;
+                waterVertices[waterVertexCount++] = v1;
+                waterVertices[waterVertexCount++] = v2;
+                waterVertices[waterVertexCount++] = v0;
+                waterVertices[waterVertexCount++] = v2;
+                waterVertices[waterVertexCount++] = v3;
+            }
+            renderChunk->lastWaterVertex = waterVertexCount - 1;
 
-
-                 for (int i = 0; i < 4; i++)
-                 {
-                     Vertex *v = (i == 0 ? &v0 : i == 1 ? &v1
-                     : i == 2   ? &v2
-                                : &v3);
-
-                     v->x += x;
-                     v->y += y;
-                     v->z += z;
-
-
-                     if (v->y > 0.0f) // top vertices of cube
-                     {
-                         v->y -= 0.1;
-                     }
-                 }
-
-                 waterVertices[waterVertexCount++] = v0;
-                 waterVertices[waterVertexCount++] = v1;
-                 waterVertices[waterVertexCount++] = v2;
-                 waterVertices[waterVertexCount++] = v0;
-                 waterVertices[waterVertexCount++] = v2;
-                 waterVertices[waterVertexCount++] = v3;
-             }
-             renderChunk->lastWaterVertex = waterVertexCount-1;
-
-             changedVBO = 1;
-          }
+            changedVBO = 1;
+        }
     }
 
-    
-
-    if (changedVBO) {
+    if (changedVBO)
+    {
         uploadWorldMesh();
     }
-
 }
 
-
-
-void uploadWorldMesh() {
-    if (worldVAO == 0) {
+void uploadWorldMesh()
+{
+    if (worldVAO == 0)
+    {
         glGenVertexArrays(1, &worldVAO);
     }
-    
+
     glBindVertexArray(worldVAO);
-    
-    if (worldVBO == 0) {
+
+    if (worldVBO == 0)
+    {
         glGenBuffers(1, &worldVBO);
     }
 
@@ -1300,29 +1305,30 @@ void uploadWorldMesh() {
 
     glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * worldVertexCount, worldVertices, GL_STATIC_DRAW);
     // position attribute
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)0);
     glEnableVertexAttribArray(0);
 
     // texcoord attribute
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(3 * sizeof(float)));
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
     // layer attribute location
-    glVertexAttribIPointer(2, 1, GL_INT, sizeof(Vertex), (void*)(offsetof(Vertex, layer)));
+    glVertexAttribIPointer(2, 1, GL_INT, sizeof(Vertex), (void *)(offsetof(Vertex, layer)));
     glEnableVertexAttribArray(2);
 
     glBindVertexArray(0); // unbind
 
-
     // * ////////////////////////////////////////////////////////
 
-    if (waterVAO == 0) {
+    if (waterVAO == 0)
+    {
         glGenVertexArrays(1, &waterVAO);
     }
-    
+
     glBindVertexArray(waterVAO);
-    
-    if (waterVBO == 0) {
+
+    if (waterVBO == 0)
+    {
         glGenBuffers(1, &waterVBO);
     }
 
@@ -1330,20 +1336,19 @@ void uploadWorldMesh() {
 
     glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * waterVertexCount, waterVertices, GL_STATIC_DRAW);
     // position attribute
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)0);
     glEnableVertexAttribArray(0);
 
     // texcoord attribute
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(3 * sizeof(float)));
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
 
     // layer attribute location
-    glVertexAttribIPointer(2, 1, GL_INT, sizeof(Vertex), (void*)(offsetof(Vertex, layer)));
+    glVertexAttribIPointer(2, 1, GL_INT, sizeof(Vertex), (void *)(offsetof(Vertex, layer)));
     glEnableVertexAttribArray(2);
 
     glBindVertexArray(0); // unbind
 }
-
 
 void drawGraphics()
 {
@@ -1357,13 +1362,17 @@ void drawGraphics()
         frameCount = 0;
         lastFpsTime = currentTime;
     }
-    PLAYER_SPEED = 10 * (currentTime - lastTime);
+    DELTA_TIME = (currentTime - lastTime);
     lastTime = currentTime;
     handleUserMovement();
-
+    updatePlayerPhysics(&player);
     raycastFromCamera();
 
-    GLfloat playerCoords[2] = {CameraX, CameraZ};
+    eyeX = player.position.x;
+    eyeY = player.position.y + EYE_HEIGHT_OFFSET;
+    eyeZ = player.position.z;
+
+    GLfloat playerCoords[2] = {player.position.x, player.position.z};
     loadChunks(playerCoords);
 
     GLfloat Vertices[8][3] = {
@@ -1378,7 +1387,7 @@ void drawGraphics()
         {0.5, -0.5, -0.5},
         {-0.5, -0.5, -0.5},
     };
-  
+
     // clear color buffer to clear background, uses preset color setup in initGraphics
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -1387,17 +1396,14 @@ void drawGraphics()
     // eye -> where the camera is located in the world space
     // center -> where the camera is looking at
     // up -> what direction is up for the camera
-    // CameraX = cos(T)*15;
-    // CameraZ = sin(T)*15;
+    // eyeX = cos(T)*15;
+    // eyeZ = sin(T)*15;
     gluLookAt(
-        CameraX, CameraY, CameraZ,
-        CameraX + PlayerDirX, CameraY + PlayerDirY, CameraZ + PlayerDirZ,
+        eyeX, eyeY, eyeZ,
+        eyeX + PlayerDirX, eyeY + PlayerDirY, eyeZ + PlayerDirZ,
         0, 1, 0);
 
     glPointSize(5);
-
-
-    
 
     // clip = modelview * projection
     // clip = proj * modelview
@@ -1411,10 +1417,9 @@ void drawGraphics()
     glLoadMatrixf(clip);
     glMultMatrixf(modelview);
     glGetFloatv(GL_MODELVIEW_MATRIX, clip);
-    glPopMatrix(); 
+    glPopMatrix();
 
-    
-    buildWorldMesh();   // fills worldVertices and worldVertexCount
+    buildWorldMesh(); // fills worldVertices and worldVertexCount
 
     glUseProgram(worldShader);
 
@@ -1426,13 +1431,11 @@ void drawGraphics()
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_REPEAT);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    
-   
+
     glBindVertexArray(worldVAO);
     glDrawArrays(GL_TRIANGLES, 0, worldVertexCount);
     glBindVertexArray(0);
-    
-    
+
     // * ////////////
 
     glEnable(GL_BLEND);
@@ -1440,12 +1443,11 @@ void drawGraphics()
     glDepthMask(GL_FALSE);
     glDepthFunc(GL_LEQUAL);
 
-      
-    glDisable(GL_CULL_FACE); 
+    glDisable(GL_CULL_FACE);
     glBindVertexArray(waterVAO);
     glDrawArrays(GL_TRIANGLES, 0, waterVertexCount);
     glBindVertexArray(0);
-    glEnable(GL_CULL_FACE); 
+    glEnable(GL_CULL_FACE);
 
     glDepthMask(GL_TRUE);
     glDisable(GL_BLEND);
@@ -1455,7 +1457,7 @@ void drawGraphics()
     glDisable(GL_TEXTURE_2D);
     glDisable(GL_TEXTURE_2D_ARRAY);
     glDisable(GL_TEXTURE_3D);
-    
+
     for (int i = 0; i < 16; i++)
         glDisableVertexAttribArray(i);
 
@@ -1484,10 +1486,9 @@ void drawGraphics()
         }
 
         glColor3f(1.0f, 1.0f, 1.0f);
-    } 
+    }
     glPopAttrib();
-    
-    
+
     glUseProgram(0);
     glBindVertexArray(0);
     glDepthMask(GL_TRUE);
@@ -1500,7 +1501,6 @@ void drawGraphics()
     int windowHeight = glutGet(GLUT_WINDOW_HEIGHT);
 
     gluOrtho2D(0, windowWidth, windowHeight, 0);
-    
 
     glMatrixMode(GL_MODELVIEW);
     glPushMatrix();
@@ -1511,24 +1511,22 @@ void drawGraphics()
     glDepthMask(GL_FALSE);
 
     // draw 2d things
-    int inWater = isCameraInWater(); 
-    if (inWater) { 
-        glEnable(GL_BLEND); 
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); 
-        float depthAlpha = MAX(MIN((SEA_LEVEL+2 - CameraY)/25, 0.55), 0.25);
-        glColor4f(0.0f, 0.3f, 0.8f, depthAlpha); 
+    int inWater = isCameraInWater();
+    if (inWater)
+    {
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        float depthAlpha = MAX(MIN((SEA_LEVEL + 2 - eyeY) / 25, 0.55), 0.25);
+        glColor4f(0.0f, 0.3f, 0.8f, depthAlpha);
         glBegin(GL_QUADS);
         glVertex2f(0, 0);
         glVertex2f(0, windowHeight);
         glVertex2f(windowWidth, windowHeight);
         glVertex2f(windowWidth, 0);
         glEnd();
-        glDisable(GL_BLEND); 
+        glDisable(GL_BLEND);
+        player.isOnGround = 1;
     }
-
-
-
-
 
     glColor3f(1.0f, 0.0f, 0.0f);
     glLineWidth(2.0f);
@@ -1540,7 +1538,7 @@ void drawGraphics()
     glEnd();
 
     char text[64];
-    snprintf(text, sizeof(text), "FPS: %.1f, Vertices: %d", fps, worldVertexCount+waterVertexCount);
+    snprintf(text, sizeof(text), "FPS: %.1f, Vertices: %d", fps, worldVertexCount + waterVertexCount);
 
     glColor3f(1, 1, 1);
     drawText(text, 5, 15);
@@ -1549,10 +1547,9 @@ void drawGraphics()
 
     ////////////////////////////////////////
 
-
-    float slotSize = 40.0f;   
-    float padding  = 4.0f;      
-    int slotCount  = 9;
+    float slotSize = 40.0f;
+    float padding = 4.0f;
+    int slotCount = 9;
 
     float barWidth = slotCount * slotSize + (slotCount - 1) * padding;
     float barHeight = slotSize;
@@ -1565,7 +1562,6 @@ void drawGraphics()
     // --- setup ---
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
 
     // --- background ---
     glColor4f(0.0f, 0.0f, 0.0f, 0.55f);
@@ -1580,15 +1576,12 @@ void drawGraphics()
     glColor3f(0.6f, 0.6f, 0.6f);
     glLineWidth(2.0f);
     glBegin(GL_LINE_LOOP);
-    glVertex2f(barLeft,  barBottom);
-    glVertex2f(barLeft,  barTop);
+    glVertex2f(barLeft, barBottom);
+    glVertex2f(barLeft, barTop);
     glVertex2f(barLeft + barWidth, barTop);
     glVertex2f(barLeft + barWidth, barBottom);
     glEnd();
 
-    
-
-    
     for (int i = 0; i < slotCount; i++)
     {
         float x0 = barLeft + i * (slotSize + padding);
@@ -1605,7 +1598,6 @@ void drawGraphics()
 
         if (hotbarBlocks[i] == -1)
             continue;
-
 
         int layer = blockRegistry[hotbarBlocks[i]].sideTexture;
 
@@ -1646,15 +1638,16 @@ void drawGraphics()
         glVertex2f(ix0, iy1);
 
         glEnd();
-        glUseProgram(0); 
+        glUseProgram(0);
     }
 
-    if (hotbarActiveSlot != -1) {
+    if (hotbarActiveSlot != -1)
+    {
         int selected = hotbarActiveSlot;
-    
+
         float selX0 = barLeft + selected * (slotSize + padding);
         float selX1 = selX0 + slotSize;
-    
+
         glColor3f(1.0f, 1.0f, 1.0f);
         glLineWidth(3.0f);
         glBegin(GL_LINE_LOOP);
@@ -1667,9 +1660,6 @@ void drawGraphics()
 
     ////////////////////
 
-
-
-
     glColor3f(1.0f, 1.0f, 1.0f);
     glEnable(GL_DEPTH_TEST);
     glDepthMask(GL_TRUE);
@@ -1680,10 +1670,98 @@ void drawGraphics()
     glPopMatrix();
     glMatrixMode(GL_MODELVIEW);
 
-
-
-    
-
     // switch the content of color and depth buffers
     glutSwapBuffers();
+
+
+
+
+
+    if (userBlockBreakingTimeElapsed != -1.f)
+    {
+        userBlockBreakingTimeElapsed += DELTA_TIME;
+
+        if (!selectedBlockToRender.active)
+        {
+            return;
+        }
+        int x, y, z;
+        x = selectedBlockToRender.localX;
+        y = selectedBlockToRender.localY;
+        z = selectedBlockToRender.localZ;
+
+        int chunkXUnit = ChunkWidthX * BlockWidthX;
+        int chunkZUnit = ChunkLengthZ * BlockLengthZ;
+
+        // break blocks
+        int blockType = selectedBlockToRender.chunk->blocks[x + (ChunkWidthX)*z + (ChunkWidthX * ChunkLengthZ) * y].blockType;
+
+        if (userBlockBreakingTimeElapsed >= blockRegistry[blockType].blockBreakingTime && beginBlockBreakingIndex == (x + (ChunkWidthX)*z + (ChunkWidthX * ChunkLengthZ) * y))
+        {
+            selectedBlockToRender.chunk->blocks[x + (ChunkWidthX)*z + (ChunkWidthX * ChunkLengthZ) * y].isAir = 1;
+            userBlockBreakingTimeElapsed = -1.f;
+
+            for (int i = 0; i < 9; i++)
+            {
+                if (hotbarBlocks[i] == blockType)
+                {
+                    break;
+                }
+                if (hotbarBlocks[i] == -1)
+                {
+                    hotbarBlocks[i] = blockType;
+                    break;
+                }
+            }
+
+            triggerRenderChunkRebuild(selectedBlockToRender.chunk);
+        }
+        else
+        {
+            if (beginBlockBreakingIndex == -1)
+            {
+                beginBlockBreakingIndex = (x + (ChunkWidthX)*z + (ChunkWidthX * ChunkLengthZ) * y);
+                beginBlockBreakingBlockType = blockType;
+            }
+            else if (beginBlockBreakingIndex != (x + (ChunkWidthX)*z + (ChunkWidthX * ChunkLengthZ) * y))
+            {
+                userBlockBreakingTimeElapsed = -1.f;
+            }
+            return;
+        }
+
+        if (x == 0)
+        {
+            uint64_t chunkKey = packChunkKey(
+                (int)((selectedBlockToRender.chunk->chunkStartX - chunkXUnit) / (chunkXUnit)),
+                (int)((selectedBlockToRender.chunk->chunkStartZ) / (chunkZUnit)));
+            BucketEntry *result = getHashmapEntry(chunkKey);
+            triggerRenderChunkRebuild(result->chunkEntry);
+        }
+        else if (x == ChunkWidthX - 1)
+        {
+            uint64_t chunkKey = packChunkKey(
+                (int)((selectedBlockToRender.chunk->chunkStartX + chunkXUnit) / (chunkXUnit)),
+                (int)((selectedBlockToRender.chunk->chunkStartZ) / (chunkZUnit)));
+            BucketEntry *result = getHashmapEntry(chunkKey);
+            triggerRenderChunkRebuild(result->chunkEntry);
+        }
+
+        if (z == 0)
+        {
+            uint64_t chunkKey = packChunkKey(
+                (int)((selectedBlockToRender.chunk->chunkStartX) / (chunkXUnit)),
+                (int)((selectedBlockToRender.chunk->chunkStartZ - chunkZUnit) / (chunkZUnit)));
+            BucketEntry *result = getHashmapEntry(chunkKey);
+            triggerRenderChunkRebuild(result->chunkEntry);
+        }
+        else if (z == ChunkLengthZ - 1)
+        {
+            uint64_t chunkKey = packChunkKey(
+                (int)((selectedBlockToRender.chunk->chunkStartX) / (chunkXUnit)),
+                (int)((selectedBlockToRender.chunk->chunkStartZ + chunkZUnit) / (chunkZUnit)));
+            BucketEntry *result = getHashmapEntry(chunkKey);
+            triggerRenderChunkRebuild(result->chunkEntry);
+        }
+    }
 }

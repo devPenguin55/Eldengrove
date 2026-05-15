@@ -163,7 +163,7 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
 
             int treeValid = !(fbm2D(worldX / 1.5f, worldZ / 1.5f, 5, 2, 2.0, 5.0) <= 0.45f);
             int flowerValid = fbm2D(worldX / 10.f, worldZ / 10.f, 5, 2, 2.0, 5.0) > 0.37f;
-            int shortGrassValid = fbm2D(worldX / 1.2f, worldZ / 10.f, 5, 2, 2.0, 5.0) > 0.33f;
+            int shortGrassValid = fbm2D(worldX / 1.2f, worldZ / 10.f, 5, 2, 2.0, 5.0) > 0.30f;
 
             if (flowerValid && !treeValid && !shortGrassValid) {
                 // flowers addition
@@ -322,13 +322,13 @@ static inline int checkIfFaceValidToBeInMesh(Block *mainBlock, Block *neighborBl
         return 0;
 
     
-    if (!mainBlock->isAir && !neighborBlock->isAir && !blockRegistry[mainBlock->blockType].isSolid && !blockRegistry[neighborBlock->blockType].isSolid && mainBlock->blockType != BLOCK_TYPE_WATER && neighborBlock->blockType != BLOCK_TYPE_WATER) {
+    if (!mainBlock->isAir && !neighborBlock->isAir && !blockRegistry[mainBlock->blockType].isRenderSolid && !blockRegistry[neighborBlock->blockType].isRenderSolid && mainBlock->blockType != BLOCK_TYPE_WATER && neighborBlock->blockType != BLOCK_TYPE_WATER) {
         return 1;
     }
-    if (!mainBlock->isAir && !neighborBlock->isAir && blockRegistry[mainBlock->blockType].isSolid && !blockRegistry[neighborBlock->blockType].isSolid && mainBlock->blockType != BLOCK_TYPE_WATER && neighborBlock->blockType != BLOCK_TYPE_WATER) {
+    if (!mainBlock->isAir && !neighborBlock->isAir && blockRegistry[mainBlock->blockType].isRenderSolid && !blockRegistry[neighborBlock->blockType].isRenderSolid && mainBlock->blockType != BLOCK_TYPE_WATER && neighborBlock->blockType != BLOCK_TYPE_WATER) {
         return 1;
     }
-    
+     
     
 
     // normal solid block
@@ -425,7 +425,7 @@ void generateChunkMesh(Chunk *chunk)
                 int frontBlockIndex = blockIndex - ChunkWidthX;
                 int backBlockIndex = blockIndex + ChunkWidthX;
 
-                if (!chunk->blocks[blockIndex].isAir && blockRegistry[chunk->blocks[blockIndex].blockType].isCross) {
+                if (!chunk->blocks[blockIndex].isAir && blockRegistry[chunk->blocks[blockIndex].blockType].isRenderCross) {
                     crosses[blockIndex] = 1;
                     continue;
                 }

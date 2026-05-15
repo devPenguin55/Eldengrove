@@ -58,7 +58,7 @@ typedef struct BlockType
     int bottomTexture;
     int sideTexture;
     int isRenderSolid;
-    int blockBreakingTime;
+    float blockBreakingTime;
     int isRenderCross;
     int isPhysicsSolid;
 } BlockType;

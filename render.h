@@ -22,6 +22,7 @@ typedef struct SelectedBlockToRender {
     float localZ;
     int  hitFace;
     Chunk *chunk;
+    int amtSteps;
 } SelectedBlockToRender;
 
 typedef struct Vertex {
@@ -32,9 +33,6 @@ typedef struct Vertex {
 
 
 extern GLfloat T;
-extern GLfloat CameraX;
-extern GLfloat CameraY;
-extern GLfloat CameraZ;
 extern GLfloat PlayerDirX;
 extern GLfloat PlayerDirY;
 extern GLfloat PlayerDirZ;

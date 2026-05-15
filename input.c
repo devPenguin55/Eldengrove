@@ -6,14 +6,29 @@
 #include "input.h"
 #include "render.h"
 #include "chunkLoaderManager.h"
+#include "player.h"
 
-GLfloat CameraX = 33.3;
-GLfloat CameraY = 60; // 63;
-GLfloat CameraZ = 0;
 GLfloat PlayerDirX = -5;
 GLfloat PlayerDirY = 0;
 GLfloat PlayerDirZ = -1;
-float PLAYER_SPEED = 0.005;
+Player player = (Player){
+    .position.x = 33.3,
+    .position.y = 100,
+    .position.z = 0,
+    .velocity.x = 0,
+    .velocity.y = 0,
+    .velocity.z = 0,
+    .isOnGround = 0,
+    .width = 0.75f,
+    .height = 1.8f};
+GLfloat EYE_HEIGHT_OFFSET = 1.62f;
+GLfloat eyeX;
+GLfloat eyeY;
+GLfloat eyeZ;
+
+int DEV_MODE = 0;
+
+float DELTA_TIME = 0.001;
 
 float yaw = 0.0f;   // horizontal rotation
 float pitch = 0.0f; // vertical   rotation
@@ -21,9 +36,16 @@ float pitch = 0.0f; // vertical   rotation
 int pressedKeys[256] = {0};
 
 int isFullscreen = 0;
-int userBlockBreakingTimeElapsed = 0;
+float userBlockBreakingTimeElapsed = -1.f;
 int beginBlockBreakingIndex = -1;
 int beginBlockBreakingBlockType = -1;
+
+void playerInit()
+{
+    eyeX = player.position.x;
+    eyeY = player.position.y + EYE_HEIGHT_OFFSET;
+    eyeZ = player.position.z;
+}
 
 void toggleFullscreen()
 {
@@ -72,6 +94,7 @@ void handleMouse(int button, int state, int x_, int y_)
         {
             return;
         }
+
         int x, y, z;
         x = selectedBlockToRender.localX;
         y = selectedBlockToRender.localY;
@@ -83,7 +106,7 @@ void handleMouse(int button, int state, int x_, int y_)
         if (button == GLUT_LEFT_BUTTON)
         {
             // break blocks
-            userBlockBreakingTimeElapsed = 1;
+            userBlockBreakingTimeElapsed = 0.0f;
             beginBlockBreakingIndex = (x + (ChunkWidthX)*z + (ChunkWidthX * ChunkLengthZ) * y);
             beginBlockBreakingBlockType = selectedBlockToRender.chunk->blocks[beginBlockBreakingIndex].blockType;
         }
@@ -106,6 +129,13 @@ void handleMouse(int button, int state, int x_, int y_)
                 }
                 selectedBlockToRender.chunk->blocks[blockIndex].isAir = 0;
                 selectedBlockToRender.chunk->blocks[blockIndex].blockType = hotbarBlocks[hotbarActiveSlot];
+
+                if (playerCollides(&player))
+                {
+                    selectedBlockToRender.chunk->blocks[blockIndex].isAir = 1;
+                    selectedBlockToRender.chunk->blocks[blockIndex].blockType = -1;
+                    return;
+                }
             }
             else if (selectedBlockToRender.hitFace == FACE_BOTTOM)
             {
@@ -116,6 +146,13 @@ void handleMouse(int button, int state, int x_, int y_)
                 }
                 selectedBlockToRender.chunk->blocks[blockIndex].isAir = 0;
                 selectedBlockToRender.chunk->blocks[blockIndex].blockType = hotbarBlocks[hotbarActiveSlot];
+
+                if (playerCollides(&player))
+                {
+                    selectedBlockToRender.chunk->blocks[blockIndex].isAir = 1;
+                    selectedBlockToRender.chunk->blocks[blockIndex].blockType = -1;
+                    return;
+                }
             }
             else if (selectedBlockToRender.hitFace == FACE_LEFT)
             {
@@ -124,6 +161,13 @@ void handleMouse(int button, int state, int x_, int y_)
                     blockIndex = x - 1 + (ChunkWidthX)*z + (ChunkWidthX * ChunkLengthZ) * y;
                     selectedBlockToRender.chunk->blocks[blockIndex].isAir = 0;
                     selectedBlockToRender.chunk->blocks[blockIndex].blockType = hotbarBlocks[hotbarActiveSlot];
+
+                    if (playerCollides(&player))
+                    {
+                        selectedBlockToRender.chunk->blocks[blockIndex].isAir = 1;
+                        selectedBlockToRender.chunk->blocks[blockIndex].blockType = -1;
+                        return;
+                    }
                 }
                 else
                 {
@@ -133,6 +177,14 @@ void handleMouse(int button, int state, int x_, int y_)
                     BucketEntry *result = getHashmapEntry(chunkKey);
                     blockIndex = ChunkWidthX - 1 + (ChunkWidthX)*z + (ChunkWidthX * ChunkLengthZ) * y;
                     result->chunkEntry->blocks[blockIndex].isAir = 0;
+                    result->chunkEntry->blocks[blockIndex].blockType = hotbarBlocks[hotbarActiveSlot];
+
+                    if (playerCollides(&player))
+                    {
+                        result->chunkEntry->blocks[blockIndex].isAir = 1;
+                        result->chunkEntry->blocks[blockIndex].blockType = -1;
+                        return;
+                    }
                     triggerRenderChunkRebuild(result->chunkEntry);
                 }
             }
@@ -143,6 +195,13 @@ void handleMouse(int button, int state, int x_, int y_)
                     blockIndex = x + 1 + (ChunkWidthX)*z + (ChunkWidthX * ChunkLengthZ) * y;
                     selectedBlockToRender.chunk->blocks[blockIndex].isAir = 0;
                     selectedBlockToRender.chunk->blocks[blockIndex].blockType = hotbarBlocks[hotbarActiveSlot];
+
+                    if (playerCollides(&player))
+                    {
+                        selectedBlockToRender.chunk->blocks[blockIndex].isAir = 1;
+                        selectedBlockToRender.chunk->blocks[blockIndex].blockType = -1;
+                        return;
+                    }
                 }
                 else
                 {
@@ -152,6 +211,13 @@ void handleMouse(int button, int state, int x_, int y_)
                     BucketEntry *result = getHashmapEntry(chunkKey);
                     blockIndex = 0 + (ChunkWidthX)*z + (ChunkWidthX * ChunkLengthZ) * y;
                     result->chunkEntry->blocks[blockIndex].isAir = 0;
+                    result->chunkEntry->blocks[blockIndex].blockType = hotbarBlocks[hotbarActiveSlot];
+                    if (playerCollides(&player))
+                    {
+                        result->chunkEntry->blocks[blockIndex].isAir = 1;
+                        result->chunkEntry->blocks[blockIndex].blockType = -1;
+                        return;
+                    }
                     triggerRenderChunkRebuild(result->chunkEntry);
                 }
             }
@@ -162,6 +228,13 @@ void handleMouse(int button, int state, int x_, int y_)
                     blockIndex = x + (ChunkWidthX) * (z + 1) + (ChunkWidthX * ChunkLengthZ) * y;
                     selectedBlockToRender.chunk->blocks[blockIndex].isAir = 0;
                     selectedBlockToRender.chunk->blocks[blockIndex].blockType = hotbarBlocks[hotbarActiveSlot];
+
+                    if (playerCollides(&player))
+                    {
+                        selectedBlockToRender.chunk->blocks[blockIndex].isAir = 1;
+                        selectedBlockToRender.chunk->blocks[blockIndex].blockType = -1;
+                        return;
+                    }
                 }
                 else
                 {
@@ -171,6 +244,14 @@ void handleMouse(int button, int state, int x_, int y_)
                     BucketEntry *result = getHashmapEntry(chunkKey);
                     blockIndex = x + (ChunkWidthX) * (0) + (ChunkWidthX * ChunkLengthZ) * y;
                     result->chunkEntry->blocks[blockIndex].isAir = 0;
+                    result->chunkEntry->blocks[blockIndex].blockType = hotbarBlocks[hotbarActiveSlot];
+
+                    if (playerCollides(&player))
+                    {
+                        result->chunkEntry->blocks[blockIndex].isAir = 1;
+                        result->chunkEntry->blocks[blockIndex].blockType = -1;
+                        return;
+                    }
                     triggerRenderChunkRebuild(result->chunkEntry);
                 }
             }
@@ -181,6 +262,13 @@ void handleMouse(int button, int state, int x_, int y_)
                     blockIndex = x + (ChunkWidthX) * (z - 1) + (ChunkWidthX * ChunkLengthZ) * y;
                     selectedBlockToRender.chunk->blocks[blockIndex].isAir = 0;
                     selectedBlockToRender.chunk->blocks[blockIndex].blockType = hotbarBlocks[hotbarActiveSlot];
+
+                    if (playerCollides(&player))
+                    {
+                        selectedBlockToRender.chunk->blocks[blockIndex].isAir = 1;
+                        selectedBlockToRender.chunk->blocks[blockIndex].blockType = -1;
+                        return;
+                    }
                 }
                 else
                 {
@@ -190,6 +278,14 @@ void handleMouse(int button, int state, int x_, int y_)
                     BucketEntry *result = getHashmapEntry(chunkKey);
                     blockIndex = x + (ChunkWidthX) * (ChunkLengthZ - 1) + (ChunkWidthX * ChunkLengthZ) * y;
                     result->chunkEntry->blocks[blockIndex].isAir = 0;
+                    result->chunkEntry->blocks[blockIndex].blockType = hotbarBlocks[hotbarActiveSlot];
+
+                    if (playerCollides(&player))
+                    {
+                        result->chunkEntry->blocks[blockIndex].isAir = 1;
+                        result->chunkEntry->blocks[blockIndex].blockType = -1;
+                        return;
+                    }
                     triggerRenderChunkRebuild(result->chunkEntry);
                 }
             }
@@ -198,7 +294,7 @@ void handleMouse(int button, int state, int x_, int y_)
     }
     else
     {
-        userBlockBreakingTimeElapsed = 0;
+        userBlockBreakingTimeElapsed = -1.f;
     }
 }
 
@@ -224,93 +320,7 @@ void handleMovingMouse(int x, int y)
     glutPostRedisplay();
     glutWarpPointer(windowCenterX, windowCenterY);
 
-    if (userBlockBreakingTimeElapsed >= 1)
-    {
-        userBlockBreakingTimeElapsed++;
-
-        if (!selectedBlockToRender.active)
-        {
-            return;
-        }
-        int x, y, z;
-        x = selectedBlockToRender.localX;
-        y = selectedBlockToRender.localY;
-        z = selectedBlockToRender.localZ;
-
-        int chunkXUnit = ChunkWidthX * BlockWidthX;
-        int chunkZUnit = ChunkLengthZ * BlockLengthZ;
-
-        // break blocks
-        int blockType = selectedBlockToRender.chunk->blocks[x + (ChunkWidthX)*z + (ChunkWidthX * ChunkLengthZ) * y].blockType;
-
-        if (userBlockBreakingTimeElapsed >= blockRegistry[blockType].blockBreakingTime && beginBlockBreakingIndex == (x + (ChunkWidthX)*z + (ChunkWidthX * ChunkLengthZ) * y))
-        {
-            selectedBlockToRender.chunk->blocks[x + (ChunkWidthX)*z + (ChunkWidthX * ChunkLengthZ) * y].isAir = 1;
-            userBlockBreakingTimeElapsed = 0;
-
-            for (int i = 0; i < 9; i++)
-            {
-                if (hotbarBlocks[i] == blockType)
-                {
-                    break;
-                }
-                if (hotbarBlocks[i] == -1)
-                {
-                    hotbarBlocks[i] = blockType;
-                    break;
-                }
-            }
-
-            triggerRenderChunkRebuild(selectedBlockToRender.chunk);
-        }
-        else
-        {
-            if (beginBlockBreakingIndex == -1)
-            {
-                beginBlockBreakingIndex = (x + (ChunkWidthX)*z + (ChunkWidthX * ChunkLengthZ) * y);
-                beginBlockBreakingBlockType = blockType;
-            }
-            else if (beginBlockBreakingIndex != (x + (ChunkWidthX)*z + (ChunkWidthX * ChunkLengthZ) * y))
-            {
-                userBlockBreakingTimeElapsed = 0;
-            }
-            return;
-        }
-
-        if (x == 0)
-        {
-            uint64_t chunkKey = packChunkKey(
-                (int)((selectedBlockToRender.chunk->chunkStartX - chunkXUnit) / (chunkXUnit)),
-                (int)((selectedBlockToRender.chunk->chunkStartZ) / (chunkZUnit)));
-            BucketEntry *result = getHashmapEntry(chunkKey);
-            triggerRenderChunkRebuild(result->chunkEntry);
-        }
-        else if (x == ChunkWidthX - 1)
-        {
-            uint64_t chunkKey = packChunkKey(
-                (int)((selectedBlockToRender.chunk->chunkStartX + chunkXUnit) / (chunkXUnit)),
-                (int)((selectedBlockToRender.chunk->chunkStartZ) / (chunkZUnit)));
-            BucketEntry *result = getHashmapEntry(chunkKey);
-            triggerRenderChunkRebuild(result->chunkEntry);
-        }
-
-        if (z == 0)
-        {
-            uint64_t chunkKey = packChunkKey(
-                (int)((selectedBlockToRender.chunk->chunkStartX) / (chunkXUnit)),
-                (int)((selectedBlockToRender.chunk->chunkStartZ - chunkZUnit) / (chunkZUnit)));
-            BucketEntry *result = getHashmapEntry(chunkKey);
-            triggerRenderChunkRebuild(result->chunkEntry);
-        }
-        else if (z == ChunkLengthZ - 1)
-        {
-            uint64_t chunkKey = packChunkKey(
-                (int)((selectedBlockToRender.chunk->chunkStartX) / (chunkXUnit)),
-                (int)((selectedBlockToRender.chunk->chunkStartZ + chunkZUnit) / (chunkZUnit)));
-            BucketEntry *result = getHashmapEntry(chunkKey);
-            triggerRenderChunkRebuild(result->chunkEntry);
-        }
-    }
+    
 }
 
 void handleUserMovement()
@@ -318,34 +328,57 @@ void handleUserMovement()
     GLfloat RightX = PlayerDirZ; // perpendicular on XZ plane
     GLfloat RightZ = -PlayerDirX;
 
+    player.velocity.x = 0;
+    player.velocity.z = 0;
+    float moveX = 0.0f;
+    float moveZ = 0.0f;
     if (pressedKeys['w'])
     {
-        CameraX += PlayerDirX * PLAYER_SPEED;
-        CameraZ += PlayerDirZ * PLAYER_SPEED;
+        moveX += PlayerDirX;
+        moveZ += PlayerDirZ;
     }
     if (pressedKeys['s'])
     {
-        CameraX -= PlayerDirX * PLAYER_SPEED;
-        CameraZ -= PlayerDirZ * PLAYER_SPEED;
+        moveX -= PlayerDirX;
+        moveZ -= PlayerDirZ;
     }
     if (pressedKeys['d'])
     {
-        CameraX -= RightX * PLAYER_SPEED;
-        CameraZ -= RightZ * PLAYER_SPEED;
+        moveX -= RightX;
+        moveZ -= RightZ;
     }
     if (pressedKeys['a'])
     {
-        CameraX += RightX * PLAYER_SPEED;
-        CameraZ += RightZ * PLAYER_SPEED;
+        moveX += RightX;
+        moveZ += RightZ;
     }
+
+    // if (DEV_MODE) {
     if (pressedKeys['r'])
     {
-        CameraY += 0.8 * PLAYER_SPEED;
+        player.velocity.y = 5.0f;
     }
     if (pressedKeys['f'])
     {
-        CameraY -= 0.8 * PLAYER_SPEED;
+        player.velocity.y = -5.0f;
     }
+    // } else {
+    if (pressedKeys[' '] && player.isOnGround)
+    {
+        player.velocity.y = 7.5f;
+        player.isOnGround = 0;
+    }
+    // }
+
+    float length = sqrtf(moveX * moveX + moveZ * moveZ);
+
+    if (length > 0.0f)
+    {
+        moveX /= length;
+        moveZ /= length;
+    }
+    player.velocity.x = moveX * 6;
+    player.velocity.z = moveZ * 6;
 
     // hotbar selection (keys 1–9)
     if (pressedKeys['1'])
@@ -366,30 +399,4 @@ void handleUserMovement()
         hotbarActiveSlot = 7;
     if (pressedKeys['9'])
         hotbarActiveSlot = 8;
-
-    // int voxelX, voxelY, voxelZ;
-    // int localX, localY, localZ;
-    // voxelX = (int)round(CameraX / BlockWidthX);
-    // voxelY = (int)round(CameraY / BlockHeightY);
-    // voxelZ = (int)round(CameraZ / BlockLengthZ);
-    // int chunkX = (voxelX >= 0) ? voxelX / ChunkWidthX : (voxelX - (ChunkWidthX-1)) / ChunkWidthX;
-    // int chunkZ = (voxelZ >= 0) ? voxelZ / ChunkLengthZ : (voxelZ - (ChunkLengthZ-1)) / ChunkLengthZ;
-    // localX = voxelX - chunkX * ChunkWidthX;
-    // localY = voxelY;
-    // localZ = voxelZ - chunkZ * ChunkLengthZ;
-
-    // uint64_t chunkKey = packChunkKey(chunkX, chunkZ);
-    // BucketEntry* result = getHashmapEntry(chunkKey);
-    // if (result) {
-    //     Chunk *curChunk = result->chunkEntry;
-    //     int index = localX + ChunkWidthX * localZ + (ChunkWidthX*ChunkLengthZ)*localY - (ChunkWidthX*ChunkLengthZ);
-    //     if (index >= 0 && index < ChunkWidthX*ChunkLengthZ*ChunkHeightY) {
-    //         // on block
-    //         Block *curBlock = &curChunk->blocks[index];
-    //         if (!blockRegistry[curBlock->blockType].isRenderSolid || curBlock->isAir) {
-    //             CameraY -= 0.01;
-    //         }
-    //     }
-
-    // }
 }

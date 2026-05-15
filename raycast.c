@@ -17,9 +17,9 @@ void raycastFromCamera() {
     const float step = 0.05f;      // small enough to not skip voxels
     const float maxDist = 16.0f;
 
-    float rayX = CameraX; 
-    float rayY = CameraY; 
-    float rayZ = CameraZ; 
+    float rayX = eyeX; 
+    float rayY = eyeY; 
+    float rayZ = eyeZ; 
 
 
     Block* hitBlock = NULL;
@@ -28,7 +28,9 @@ void raycastFromCamera() {
     int hitFace;
 
     Chunk* curChunk = NULL;
+    int amtSteps = 0;
     for (float dist = 0; dist < maxDist; dist += step) {
+        amtSteps = dist;
         voxelX = (int)round(rayX / BlockWidthX);
         voxelY = (int)round(rayY / BlockHeightY);
         voxelZ = (int)round(rayZ / BlockLengthZ);
@@ -86,6 +88,8 @@ void raycastFromCamera() {
         rayY += step * normDirY;
         rayZ += step * normDirZ;
     }
+
+
     voxelX = (int)round(rayX / BlockWidthX);
     voxelY = (int)round(rayY / BlockHeightY);
     voxelZ = (int)round(rayZ / BlockLengthZ);
@@ -107,4 +111,6 @@ void raycastFromCamera() {
     selectedBlockToRender.hitFace = hitFace;
 
     selectedBlockToRender.chunk = curChunk;
+
+    selectedBlockToRender.amtSteps = amtSteps;
 }

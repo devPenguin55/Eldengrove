@@ -25,7 +25,7 @@ int main(int argc, char *argv[]) {
     glutCreateWindow("Minecraft");
     glewInit();
     glutSetCursor(GLUT_CURSOR_NONE);
-
+ 
     initGraphics();
 
     glutReshapeFunc(reshape);
