@@ -1397,6 +1397,7 @@ void drawGraphics()
     handleUserMovement();
     updatePlayerPhysics(&player);
     raycastFromCamera();
+    chunkSaveOnInterval();
 
     eyeX = player.position.x;
     eyeY = player.position.y + EYE_HEIGHT_OFFSET;
@@ -1448,6 +1449,57 @@ void drawGraphics()
     glMultMatrixf(modelview);
     glGetFloatv(GL_MODELVIEW_MATRIX, clip);
     glPopMatrix();
+
+    if (pressedKeys['c']) {
+        // optionally draw the chunk borders for debug purposes
+        int chunkX = (player.position.x >= 0)
+            ? player.position.x / ChunkWidthX
+            : (player.position.x - (ChunkWidthX - 1)) / ChunkWidthX;
+
+        int chunkZ = (player.position.z >= 0)
+            ? player.position.z / ChunkLengthZ
+            : (player.position.z - (ChunkLengthZ - 1)) / ChunkLengthZ;
+
+        int localX = player.position.x - chunkX * ChunkWidthX;
+        int localY = player.position.y;
+        int localZ = player.position.z - chunkZ * ChunkLengthZ;
+
+        uint64_t chunkKey = packChunkKey(chunkX, chunkZ);
+        BucketEntry* result = getHashmapEntry(chunkKey);
+
+        if (result) {
+            Chunk* chunk = result->chunkEntry;
+            for (int dy = 0; dy <= 50; dy++)
+            {
+                glBegin(GL_LINE_LOOP);
+                glVertex3f(chunk->chunkStartX, ChunkHeightY*dy/50.0f,chunk->chunkStartZ);
+                glVertex3f(chunk->chunkStartX, ChunkHeightY*dy/50.0f,chunk->chunkStartZ+ChunkLengthZ);
+                glVertex3f(chunk->chunkStartX+ChunkWidthX, ChunkHeightY*dy/50.0f,chunk->chunkStartZ+ChunkLengthZ);
+                glVertex3f(chunk->chunkStartX+ChunkWidthX, ChunkHeightY*dy/50.0f,chunk->chunkStartZ);
+                glEnd();
+            }
+            glBegin(GL_LINES);
+            for (int dx = 0; dx <= 5; dx++)
+            {
+                glVertex3f(chunk->chunkStartX+ChunkWidthX*dx/5.0f, 0, chunk->chunkStartZ);
+                glVertex3f(chunk->chunkStartX+ChunkWidthX*dx/5.0f, ChunkHeightY, chunk->chunkStartZ);
+                glVertex3f(chunk->chunkStartX+ChunkWidthX*dx/5.0f, 0, chunk->chunkStartZ+ChunkLengthZ);
+                glVertex3f(chunk->chunkStartX+ChunkWidthX*dx/5.0f, ChunkHeightY, chunk->chunkStartZ+ChunkLengthZ);
+            }
+
+            for (int dz = 0; dz <= 5; dz++) 
+            {
+                glVertex3f(chunk->chunkStartX+ChunkWidthX, 0, chunk->chunkStartZ+ChunkLengthZ*dz/5.0f);
+                glVertex3f(chunk->chunkStartX+ChunkWidthX, ChunkHeightY, chunk->chunkStartZ+ChunkLengthZ*dz/5.0f);
+                glVertex3f(chunk->chunkStartX, 0, chunk->chunkStartZ+ChunkLengthZ*dz/5.0f);
+                glVertex3f(chunk->chunkStartX, ChunkHeightY, chunk->chunkStartZ+ChunkLengthZ*dz/5.0f);
+            }
+            glEnd();
+        }
+    }
+
+
+
 
     buildWorldMesh(); // fills worldVertices and worldVertexCount
 
@@ -1731,6 +1783,7 @@ void drawGraphics()
         {
             selectedBlockToRender.chunk->blocks[x + (ChunkWidthX)*z + (ChunkWidthX * ChunkLengthZ) * y].isAir = 1;
             userBlockBreakingTimeElapsed = -1.f;
+            selectedBlockToRender.chunk->isDirty = 1;
 
             for (int i = 0; i < 9; i++)
             {

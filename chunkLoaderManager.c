@@ -3,6 +3,8 @@
 #include <math.h>
 #include "chunkLoaderManager.h"
 #include "render.h"
+#include "input.h"
+#include "worldDiskStorage.h"
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MIN4(a, b, c, d) (MIN(MIN(a, b), MIN(c, d)))
@@ -27,6 +29,12 @@ void initChunkLoaderManager()
     chunksToUnload->amtChunksToUnload = 0;
     chunksToUnload->capacity = 16;
     chunksToUnload->chunksToUnload = malloc(chunksToUnload->capacity * sizeof(Chunk *));
+
+    ChunksToSaveToDisk *chunksToSaveToDisk = &(chunkLoaderManager.chunksToSaveToDisk);
+    chunksToSaveToDisk->amtChunksToSaveToDisk = 0;
+    chunksToSaveToDisk->capacity = 16;
+    chunksToSaveToDisk->chunksToSaveToDisk = malloc(chunksToSaveToDisk->capacity * sizeof(Chunk *));
+    chunksToSaveToDisk->elapsedTime = 0;
 
     for (int i = 0; i < HASHMAP_AMOUNT_BUCKETS; i++)
     {
@@ -189,6 +197,7 @@ void loadChunks(GLfloat playerCoords[2])
                 }
 
                 loadedChunks->loadedChunks[(loadedChunks->amtLoadedChunks)++] = result->chunkEntry;
+                fetchChunkFromDisk(chunkX, chunkZ, result->chunkEntry);
                 if (initialAmtLoadedChunksUntilMeshing < (2 * CHUNK_PRELOAD_RADIUS + 1) * (2 * CHUNK_PRELOAD_RADIUS + 1))
                 {
                     initialAmtLoadedChunksUntilMeshing++;
@@ -287,6 +296,7 @@ void loadChunks(GLfloat playerCoords[2])
             if (curChunk == loadedChunks->loadedChunks[loadedChunkIdx])
             {
                 // this is a match of pointers to a chunk
+                saveChunkToDisk(curChunk);
                 deleteHashmapEntry(curChunk->key);
                 loadedChunks->loadedChunks[loadedChunkIdx] = loadedChunks->loadedChunks[loadedChunks->amtLoadedChunks - 1];
                 loadedChunks->amtLoadedChunks--;
@@ -825,4 +835,39 @@ void loadChunks(GLfloat playerCoords[2])
 void triggerRenderChunkRebuild(Chunk *chunk)
 {
     chunk->triggerVertexRecreation = 1;
+    chunk->isDirty = 1;
+
+    ChunksToSaveToDisk *chunksToSaveToDisk = &(chunkLoaderManager.chunksToSaveToDisk);
+
+    for (int i = 0; i < chunksToSaveToDisk->amtChunksToSaveToDisk; i++)
+    {
+        if (chunksToSaveToDisk->chunksToSaveToDisk[i]->key == chunk->key) {
+            chunksToSaveToDisk->chunksToSaveToDisk[i] = chunksToSaveToDisk->chunksToSaveToDisk[chunksToSaveToDisk->amtChunksToSaveToDisk - 1];
+            chunksToSaveToDisk->amtChunksToSaveToDisk--;
+            break;
+        }
+    }
+
+    chunksToSaveToDisk->chunksToSaveToDisk[chunksToSaveToDisk->amtChunksToSaveToDisk++] = chunk;
+
+    if (chunksToSaveToDisk->amtChunksToSaveToDisk >= chunksToSaveToDisk->capacity) {
+        chunksToSaveToDisk->capacity *= 2;
+        chunksToSaveToDisk->chunksToSaveToDisk = realloc(chunksToSaveToDisk->chunksToSaveToDisk, chunksToSaveToDisk->capacity * sizeof(Chunk *));
+    }
+}
+
+
+void chunkSaveOnInterval() {
+    ChunksToSaveToDisk *chunksToSaveToDisk = &(chunkLoaderManager.chunksToSaveToDisk);
+
+    chunksToSaveToDisk->elapsedTime += DELTA_TIME;
+    
+    if (chunksToSaveToDisk->elapsedTime < 10.0f) { return; }
+
+
+    for (int i = 0; i < chunksToSaveToDisk->amtChunksToSaveToDisk; i++) {
+        saveChunkToDisk(chunksToSaveToDisk->chunksToSaveToDisk[i]);
+    }
+    chunksToSaveToDisk->amtChunksToSaveToDisk = 0;
+    chunksToSaveToDisk->elapsedTime = 0;
 }

@@ -26,6 +26,13 @@ typedef struct ChunksToUnload {
     int          capacity;
 } ChunksToUnload;
 
+typedef struct ChunksToSaveToDisk {
+    Chunk **chunksToSaveToDisk;
+    int  amtChunksToSaveToDisk;
+    int               capacity;
+    float          elapsedTime;
+} ChunksToSaveToDisk;
+
 typedef struct BucketEntry {
     uint64_t             key;
     Chunk        *chunkEntry;
@@ -45,6 +52,7 @@ typedef struct ChunkLoaderManager {
     LoadedChunks                 loadedChunks;
     RenderChunks                 renderChunks;
     ChunksToUnload             chunksToUnload;
+    ChunksToSaveToDisk     chunksToSaveToDisk;
     Hashmap                           hashmap;
 } ChunkLoaderManager;
 
@@ -58,5 +66,6 @@ void writeHashmapEntry(uint64_t key, int chunkX, int chunkZ, int exists);
 void deleteHashmapEntry(uint64_t key);
 void loadChunks(GLfloat playerCoords[2]);
 void triggerRenderChunkRebuild (Chunk *chunk);
+void chunkSaveOnInterval();
 
 #endif

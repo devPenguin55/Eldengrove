@@ -137,6 +137,7 @@ void handleMouse(int button, int state, int x_, int y_)
                     selectedBlockToRender.chunk->blocks[blockIndex].blockType = -1;
                     return;
                 }
+                selectedBlockToRender.chunk->isDirty = 1;
             }
             else if (selectedBlockToRender.hitFace == FACE_BOTTOM)
             {
@@ -154,6 +155,8 @@ void handleMouse(int button, int state, int x_, int y_)
                     selectedBlockToRender.chunk->blocks[blockIndex].blockType = -1;
                     return;
                 }
+
+                selectedBlockToRender.chunk->isDirty = 1;
             }
             else if (selectedBlockToRender.hitFace == FACE_LEFT)
             {
@@ -169,6 +172,7 @@ void handleMouse(int button, int state, int x_, int y_)
                         selectedBlockToRender.chunk->blocks[blockIndex].blockType = -1;
                         return;
                     }
+                    selectedBlockToRender.chunk->isDirty = 1;
                 }
                 else
                 {
@@ -186,6 +190,7 @@ void handleMouse(int button, int state, int x_, int y_)
                         result->chunkEntry->blocks[blockIndex].blockType = -1;
                         return;
                     }
+                    selectedBlockToRender.chunk->isDirty = 1;
                     triggerRenderChunkRebuild(result->chunkEntry);
                 }
             }
@@ -203,6 +208,7 @@ void handleMouse(int button, int state, int x_, int y_)
                         selectedBlockToRender.chunk->blocks[blockIndex].blockType = -1;
                         return;
                     }
+                    selectedBlockToRender.chunk->isDirty = 1;
                 }
                 else
                 {
@@ -219,6 +225,7 @@ void handleMouse(int button, int state, int x_, int y_)
                         result->chunkEntry->blocks[blockIndex].blockType = -1;
                         return;
                     }
+                    selectedBlockToRender.chunk->isDirty = 1;
                     triggerRenderChunkRebuild(result->chunkEntry);
                 }
             }
@@ -236,6 +243,7 @@ void handleMouse(int button, int state, int x_, int y_)
                         selectedBlockToRender.chunk->blocks[blockIndex].blockType = -1;
                         return;
                     }
+                    selectedBlockToRender.chunk->isDirty = 1;
                 }
                 else
                 {
@@ -253,6 +261,7 @@ void handleMouse(int button, int state, int x_, int y_)
                         result->chunkEntry->blocks[blockIndex].blockType = -1;
                         return;
                     }
+                    selectedBlockToRender.chunk->isDirty = 1;
                     triggerRenderChunkRebuild(result->chunkEntry);
                 }
             }
@@ -270,6 +279,7 @@ void handleMouse(int button, int state, int x_, int y_)
                         selectedBlockToRender.chunk->blocks[blockIndex].blockType = -1;
                         return;
                     }
+                    selectedBlockToRender.chunk->isDirty = 1;
                 }
                 else
                 {
@@ -287,6 +297,7 @@ void handleMouse(int button, int state, int x_, int y_)
                         result->chunkEntry->blocks[blockIndex].blockType = -1;
                         return;
                     }
+                    selectedBlockToRender.chunk->isDirty = 1;
                     triggerRenderChunkRebuild(result->chunkEntry);
                 }
             }

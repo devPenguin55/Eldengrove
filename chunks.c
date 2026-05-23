@@ -7,6 +7,7 @@
 #include "chunks.h"
 #include "chunkLoaderManager.h"
 #include "noise.h"
+#include "worldDiskStorage.h"
 
 ChunkMeshQuads chunkMeshQuads;
 BlockType blockRegistry[100];
@@ -38,6 +39,8 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
     chunk->lastVertex = -1;
     chunk->firstWaterVertex = -1;
     chunk->lastWaterVertex = -1;
+
+    chunk->isDirty = 0;
 
     for (int x = 0; x < ChunkWidthX; x++)
     {
