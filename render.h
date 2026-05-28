@@ -51,8 +51,7 @@ extern int hotbarActiveSlot;
 void initGraphics();
 void reshape(int width, int height);
 void spinObject();
-float sampleVoxelLight(int x, int y, int z);
-void adjustVerticesForQuadData(Vertex *v0, Vertex *v1, Vertex *v2, Vertex *v3, float x, float y, float z, float w, float h, int faceType);
+void adjustVerticesForQuadData(Vertex *v0, Vertex *v1, Vertex *v2, Vertex *v3, float x, float y, float z);
 void face(
     GLfloat A[3],
     GLfloat B[3],

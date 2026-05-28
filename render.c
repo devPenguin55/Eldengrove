@@ -38,7 +38,6 @@ int waterVertexCount = 0;
 int waterVertexCapacity = 0;
 
 GLuint blockTextureArray;
-GLuint lightVolumeTex;
 
 int hotbarBlocks[9];
 int hotbarActiveSlot = -1;
@@ -405,16 +404,6 @@ void spinObject()
     glutPostRedisplay();
 }
 
-float sampleVoxelLight(int x, int y, int z)
-{
-    Block *b = blockAtPosition(x, y, z);
-
-    if (b == NULL)
-        return 0.0f;
-
-    return (float)GET_SKYLIGHT(b->light) / 15.0f;
-}
-
 void adjustVerticesForQuadData(
     Vertex *v0,
     Vertex *v1,
@@ -422,10 +411,7 @@ void adjustVerticesForQuadData(
     Vertex *v3,
     float x,
     float y,
-    float z,
-    float w,
-    float h,
-    int faceType
+    float z
 )
 {
     Vertex *verts[4] = {v0, v1, v2, v3};
@@ -861,33 +847,6 @@ void checkForWorldChunkVerticesDeletion()
     }
 }
 
-
-
-void createLightVolume(int sizeX, int sizeY, int sizeZ)
-{
-    glGenTextures(1, &lightVolumeTex);
-    glBindTexture(GL_TEXTURE_3D, lightVolumeTex);
-
-    glTexImage3D(
-        GL_TEXTURE_3D,
-        0,
-        GL_R16F,              // single channel float is enough
-        sizeX,
-        sizeY,
-        sizeZ,
-        0,
-        GL_RED,
-        GL_FLOAT,
-        NULL                  // allocate empty first
-    );
-
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
-}
-
 void buildWorldMesh()
 {
     checkForWorldChunkVerticesDeletion();
@@ -1126,7 +1085,7 @@ void buildWorldMesh()
                     }
                 }
 
-                adjustVerticesForQuadData(&v0, &v1, &v2, &v3, x, y, z, w, h, q->faceType);
+                adjustVerticesForQuadData(&v0, &v1, &v2, &v3, x, y, z);
 
                 worldVertices[worldVertexCount++] = v0;
                 worldVertices[worldVertexCount++] = v1;
@@ -1311,7 +1270,7 @@ void buildWorldMesh()
                     }
                 }
 
-                adjustVerticesForQuadData(&v0, &v1, &v2, &v3, x, y, z, w, h, q->faceType);
+                adjustVerticesForQuadData(&v0, &v1, &v2, &v3, x, y, z);
                 
                 waterVertices[waterVertexCount++] = v0;
                 waterVertices[waterVertexCount++] = v1;

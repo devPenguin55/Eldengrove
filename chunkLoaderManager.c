@@ -607,7 +607,7 @@ void loadChunks(GLfloat playerCoords[2])
                         }
                     }
 
-                    adjustVerticesForQuadData(&v0, &v1, &v2, &v3, x, y, z, w, h, q->faceType);
+                    adjustVerticesForQuadData(&v0, &v1, &v2, &v3, x, y, z);
 
                     worldVertices[worldVertexCount++] = v0;
                     worldVertices[worldVertexCount++] = v1;
@@ -787,7 +787,7 @@ void loadChunks(GLfloat playerCoords[2])
                         }
                     }
 
-                    adjustVerticesForQuadData(&v0, &v1, &v2, &v3, x, y, z, w, h, q->faceType);
+                    adjustVerticesForQuadData(&v0, &v1, &v2, &v3, x, y, z);
 
                     waterVertices[waterVertexCount++] = v0;
                     waterVertices[waterVertexCount++] = v1;
