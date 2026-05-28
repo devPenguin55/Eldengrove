@@ -45,7 +45,7 @@ int isSolidVoxel(int voxelX, int voxelY, int voxelZ)
     Block* block = blockAtPosition(voxelX, voxelY, voxelZ);
 
     if (block == NULL) { return 0; }
-    
+
     return (
         blockRegistry[block->blockType].isPhysicsSolid &&
         !block->isAir

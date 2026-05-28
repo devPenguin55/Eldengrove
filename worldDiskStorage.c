@@ -11,6 +11,7 @@ void initWorldDiskStorage() {
 }
 
 void saveChunkToDisk(Chunk *chunk) {
+    return;
     if (!chunk->isDirty) { return; }
 
     Chunk copyChunk = *chunk;
@@ -40,6 +41,7 @@ void saveChunkToDisk(Chunk *chunk) {
 }
 
 void fetchChunkFromDisk(int chunkX, int chunkZ, Chunk *writeChunk) {
+    return;
     uint64_t key = packChunkKey(chunkX, chunkZ);
     char buffer[128];
     snprintf(buffer, sizeof(buffer), "worldChunkData/%" PRIu64 ".bin", key);

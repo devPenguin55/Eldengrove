@@ -263,12 +263,6 @@ void loadChunks(GLfloat playerCoords[2])
         Chunk *curChunk = loadedChunks->loadedChunks[loadedChunkIdx];
         unpackChunkKey(curChunk->key, &loadedChunkX, &loadedChunkZ);
 
-        if (isFinishedOnlyLoadingChunks && !curChunk->isBakedLightComplete)
-        {
-            printf("baking...\n");
-            computeSkylightForChunk(curChunk);
-        }
-
         if (
             (loadedChunkX > (playerChunkX + CHUNK_RENDER_RADIUS) || (loadedChunkX < (playerChunkX - CHUNK_RENDER_RADIUS))) ||
             (loadedChunkZ > (playerChunkZ + CHUNK_RENDER_RADIUS) || (loadedChunkZ < (playerChunkZ - CHUNK_RENDER_RADIUS))))
@@ -504,7 +498,6 @@ void loadChunks(GLfloat playerCoords[2])
                             verts[i]->y += y;
                             verts[i]->z += z;
                             verts[i]->layer = blockRegistry[q->blockType].sideTexture;
-                            verts[i]->brightness = 1.0f;
                         }
 
                         if ((worldVertexCount + 24) > worldVertexCapacity)
@@ -614,26 +607,7 @@ void loadChunks(GLfloat playerCoords[2])
                         }
                     }
 
-                    for (int i = 0; i < 4; i++)
-                    {
-                        Vertex *v = (i == 0 ? &v0 : i == 1 ? &v1
-                                                : i == 2   ? &v2
-                                                           : &v3);
-
-                        v->x += x;
-                        v->y += y;
-                        v->z += z;
-
-                        Block *vBlock = blockAtPosition((int)round(v->x), (int)round(v->y), (int)round(v->z));
-                        if (vBlock == NULL)
-                        {
-                            v->brightness = 0.0f;
-                        }
-                        else
-                        {
-                            v->brightness = ((float)GET_SKYLIGHT(vBlock->light)) / 15.0f;
-                        }
-                    }
+                    adjustVerticesForQuadData(&v0, &v1, &v2, &v3, x, y, z, w, h, q->faceType);
 
                     worldVertices[worldVertexCount++] = v0;
                     worldVertices[worldVertexCount++] = v1;
@@ -813,31 +787,7 @@ void loadChunks(GLfloat playerCoords[2])
                         }
                     }
 
-                    for (int i = 0; i < 4; i++)
-                    {
-                        Vertex *v = (i == 0 ? &v0 : i == 1 ? &v1
-                                                : i == 2   ? &v2
-                                                           : &v3);
-
-                        v->x += x;
-                        v->y += y;
-                        v->z += z;
-
-                        if (v->y > 0.0f) // top vertices of cube
-                        {
-                            v->y -= 0.1;
-                        }
-
-                        Block *vBlock = blockAtPosition((int)round(v->x), (int)round(v->y), (int)round(v->z));
-                        if (vBlock == NULL)
-                        {
-                            v->brightness = 0.0f;
-                        }
-                        else
-                        {
-                            v->brightness = ((float)GET_SKYLIGHT(vBlock->light)) / 15.0f;
-                        }
-                    }
+                    adjustVerticesForQuadData(&v0, &v1, &v2, &v3, x, y, z, w, h, q->faceType);
 
                     waterVertices[waterVertexCount++] = v0;
                     waterVertices[waterVertexCount++] = v1;

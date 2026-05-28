@@ -43,8 +43,6 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
 
     chunk->isDirty = 0;
 
-    chunk->isBakedLightComplete = 0;
-
     for (int x = 0; x < ChunkWidthX; x++)
     {
         for (int z = 0; z < ChunkLengthZ; z++)
@@ -146,6 +144,11 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
                     curBlock->isAir = 0;
                     curBlock->blockType = BLOCK_TYPE_WATER;
                 }
+
+                // ! REMOVE 
+                // curBlock->blockType = BLOCK_TYPE_DIRT;
+                // curBlock->isAir = y > 50;
+                // curBlock->isAir = (int)(y/2) > (int)(0.5*(40+x/2+z/2));
             }
         }
     }
@@ -372,6 +375,8 @@ static inline int checkIfFaceValidToBeInMesh(Block *mainBlock, Block *neighborBl
 
 void generateChunkMesh(Chunk *chunk)
 {
+    computeSkylightForChunk(chunk);
+
     // printf("starting mesh amts %d\n", chunkMeshQuads.amtQuads);
     int tops[ChunkWidthX][ChunkLengthZ][ChunkHeightY] = {0};    // * X-Z plane, y fixed
     int bottoms[ChunkWidthX][ChunkLengthZ][ChunkHeightY] = {0}; // * X-Z plane, y fixed
@@ -1198,17 +1203,19 @@ void deleteChunkMesh(Chunk *chunk)
 void computeSkylightForChunk(Chunk *chunk) {
     // should only be called after chunk + neighbor chunks loaded
     // this is the light baking step
-    chunk->isBakedLightComplete = 1;
     for (int x = 0; x < ChunkWidthX; x++) {
         for (int z = 0; z < ChunkLengthZ; z++) {
             uint8_t currentLight = 15;
 
             for (int y = ChunkHeightY - 1; y >= 0; y--) {
                 Block *curBlock = &chunk->blocks[x + z * (ChunkWidthX) + y * (ChunkWidthX * ChunkLengthZ)];
-                if (!curBlock->isAir) { currentLight = 0; }
-                
-                SET_SKYLIGHT(curBlock->light, currentLight);
+
+                SET_SKYLIGHT(curBlock->light, (uint8_t)(min(15, x+z)));
+
+                if (!curBlock->isAir) {
+                    currentLight = (uint8_t)0;
+                }
             }
         }
-    }
-}
+    } 
+} 

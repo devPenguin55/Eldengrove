@@ -38,6 +38,7 @@ int waterVertexCount = 0;
 int waterVertexCapacity = 0;
 
 GLuint blockTextureArray;
+GLuint lightVolumeTex;
 
 int hotbarBlocks[9];
 int hotbarActiveSlot = -1;
@@ -404,6 +405,42 @@ void spinObject()
     glutPostRedisplay();
 }
 
+float sampleVoxelLight(int x, int y, int z)
+{
+    Block *b = blockAtPosition(x, y, z);
+
+    if (b == NULL)
+        return 0.0f;
+
+    return (float)GET_SKYLIGHT(b->light) / 15.0f;
+}
+
+void adjustVerticesForQuadData(
+    Vertex *v0,
+    Vertex *v1,
+    Vertex *v2,
+    Vertex *v3,
+    float x,
+    float y,
+    float z,
+    float w,
+    float h,
+    int faceType
+)
+{
+    Vertex *verts[4] = {v0, v1, v2, v3};
+
+    for (int i = 0; i < 4; i++)
+    {
+        Vertex *v = verts[i];
+
+        v->x += x;
+        v->y += y;
+        v->z += z;
+    }
+
+}
+
 void face(
     GLfloat A[3],
     GLfloat B[3],
@@ -484,7 +521,7 @@ void face(
         glEnable(GL_POLYGON_OFFSET_FILL);
         glPolygonOffset(-2.0f, -2.0f); // slight offset to draw on top
 
-        glColor4f(0.3f, 0.3f, 0.3f, 0.1f); // gray with 40% transparency
+        glColor4f(0.3f, 0.3f, 0.3f, 0.1f); // gray with 10% transparency
 
         glBegin(GL_QUADS);
         glVertex3fv(vA);
@@ -511,7 +548,7 @@ void face(
         glDisable(GL_CULL_FACE);
 
         glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-        glLineWidth(1.5f);
+        glLineWidth(1.75f);
 
         glDepthMask(GL_FALSE);
 
@@ -824,6 +861,33 @@ void checkForWorldChunkVerticesDeletion()
     }
 }
 
+
+
+void createLightVolume(int sizeX, int sizeY, int sizeZ)
+{
+    glGenTextures(1, &lightVolumeTex);
+    glBindTexture(GL_TEXTURE_3D, lightVolumeTex);
+
+    glTexImage3D(
+        GL_TEXTURE_3D,
+        0,
+        GL_R16F,              // single channel float is enough
+        sizeX,
+        sizeY,
+        sizeZ,
+        0,
+        GL_RED,
+        GL_FLOAT,
+        NULL                  // allocate empty first
+    );
+
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+}
+
 void buildWorldMesh()
 {
     checkForWorldChunkVerticesDeletion();
@@ -948,7 +1012,6 @@ void buildWorldMesh()
                         verts[i]->y += y;
                         verts[i]->z += z;
                         verts[i]->layer = blockRegistry[q->blockType].sideTexture;
-                        verts[i]->brightness = 1.0f;
                     }
 
                     if ((worldVertexCount + 24) > worldVertexCapacity)
@@ -1063,26 +1126,7 @@ void buildWorldMesh()
                     }
                 }
 
-                for (int i = 0; i < 4; i++)
-                {
-                    Vertex *v = (i == 0 ? &v0 : i == 1 ? &v1
-                                            : i == 2   ? &v2
-                                                       : &v3);
-
-                    v->x += x;
-                    v->y += y;
-                    v->z += z;
-
-                    Block *vBlock = blockAtPosition((int)round(v->x), (int)round(v->y), (int)round(v->z));
-                    if (vBlock == NULL)
-                    {
-                        v->brightness = 0.0f;
-                    }
-                    else
-                    {
-                        v->brightness = ((float)GET_SKYLIGHT(vBlock->light)) / 15.0f;
-                    }
-                }
+                adjustVerticesForQuadData(&v0, &v1, &v2, &v3, x, y, z, w, h, q->faceType);
 
                 worldVertices[worldVertexCount++] = v0;
                 worldVertices[worldVertexCount++] = v1;
@@ -1267,32 +1311,8 @@ void buildWorldMesh()
                     }
                 }
 
-                for (int i = 0; i < 4; i++)
-                {
-                    Vertex *v = (i == 0 ? &v0 : i == 1 ? &v1
-                                            : i == 2   ? &v2
-                                                       : &v3);
-
-                    v->x += x;
-                    v->y += y;
-                    v->z += z;
-
-                    Block *vBlock = blockAtPosition((int)round(v->x), (int)round(v->y), (int)round(v->z));
-                    if (vBlock == NULL)
-                    {
-                        v->brightness = 0.0f;
-                    }
-                    else
-                    {
-                        v->brightness = ((float)GET_SKYLIGHT(vBlock->light)) / 15.0f;
-                    };
-
-                    if (v->y > 0.0f) // top vertices of cube
-                    {
-                        v->y -= 0.1;
-                    }
-                }
-
+                adjustVerticesForQuadData(&v0, &v1, &v2, &v3, x, y, z, w, h, q->faceType);
+                
                 waterVertices[waterVertexCount++] = v0;
                 waterVertices[waterVertexCount++] = v1;
                 waterVertices[waterVertexCount++] = v2;
@@ -1341,15 +1361,7 @@ void uploadWorldMesh()
     glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)(offsetof(Vertex, layer)));
     glEnableVertexAttribArray(2);
 
-    glVertexAttribPointer(
-        3,
-        1,
-        GL_FLOAT,
-        GL_FALSE,
-        sizeof(Vertex),
-        (void *)(offsetof(Vertex, brightness)));
-
-    glEnableVertexAttribArray(3);
+    glEnableVertexAttribArray(2);
 
     glBindVertexArray(0); // unbind
 
@@ -1382,14 +1394,7 @@ void uploadWorldMesh()
     glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)(offsetof(Vertex, layer)));
     glEnableVertexAttribArray(2);
 
-    glVertexAttribPointer(
-        3,
-        1,
-        GL_FLOAT,
-        GL_FALSE,
-        sizeof(Vertex),
-        (void *)(offsetof(Vertex, brightness)));
-    glEnableVertexAttribArray(3);
+    glEnableVertexAttribArray(2);
 
     glBindVertexArray(0); // unbind
 }

@@ -33,7 +33,6 @@ typedef struct Chunk
     int triggerVertexDeletion;
     int triggerVertexRecreation;
     int isDirty;
-    int isBakedLightComplete;
 } Chunk;
 
 typedef struct MeshQuad
@@ -80,6 +79,7 @@ typedef struct BlockType
 #define PLANE_Z 3
 
 #define BLOCK_TYPE_SELECT -55
+#define BLOCK_TYPE_AIR 0
 #define BLOCK_TYPE_GRASS 1
 #define BLOCK_TYPE_DIRT 2
 #define BLOCK_TYPE_STONE 3
@@ -105,6 +105,8 @@ typedef struct BlockType
 #define GET_BLOCK_LIGHT(b) ((b) & 0xF) // lower 4 bits 
 #define SET_SKYLIGHT(b, s) ((b) = ((b) & 0x0F) | (((s) & 0xF) << 4)) // clear upper 4 bits and insert shifted skylight
 #define SET_BLOCK_LIGHT(b, s) ((b) = ((b) & 0xF0) | ((s) & 0xF)) // clear lower 4 bits and insert block light 
+
+#define IS_CELL_SOLID(cell) ((cell).blockType != BLOCK_TYPE_AIR)
 
 extern float BlockWidthX;
 extern float BlockLengthZ;
