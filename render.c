@@ -1062,6 +1062,7 @@ void buildWorldMesh()
                         verts[i]->y += y;
                         verts[i]->z += z;
                         verts[i]->layer = blockRegistry[q->blockType].sideTexture;
+                        verts[i]->gpuLightIndex = chunkAtPosition(x,y,z)->gpuLightIndex;
                     }
 
                     if ((worldVertexCount + 24) > worldVertexCapacity)
