@@ -3,6 +3,7 @@
 in vec2 fragUV;
 flat in float fragLayer;
 in vec3 worldPos;
+flat in int fragGpuLightIndex;
 
 out vec4 fragColor;
 
@@ -12,7 +13,13 @@ uniform usamplerBuffer lightBuffer;
 void main()
 {
     int layer = int(fragLayer);
-    vec4 texColor = texture(blockTextures, vec3(fragUV, layer));
+
+    vec4 texColor;
+    if (layer >= 0) {
+        texColor = texture(blockTextures, vec3(fragUV, layer));
+    } else {
+        texColor = texture(blockTextures, vec3(fragUV, layer+55));
+    }
 
     if (layer == 4)
     {
@@ -24,44 +31,44 @@ void main()
         discard;
     }
 
-    
-    // example lookup
-    int x = int(round(worldPos.x));
-    int y = int(round(worldPos.y));
-    int z = int(round(worldPos.z));
+    if (layer < 0) {
+        texColor.rgb *= 1.0;
+    } else {
+        // example lookup
+        int x = int(round(worldPos.x));
+        int y = int(round(worldPos.y));
+        int z = int(round(worldPos.z));
 
-    int chunkX = int(round(float(x) / 16.0));
-    int chunkZ = int(round(float(z) / 16.0));
+        int chunkX = int(round(float(x) / 16.0));
+        int chunkZ = int(round(float(z) / 16.0));
 
-    int localX = ((x % 16) + 16) % 16;
-    int localZ = ((z % 16) + 16) % 16;
+        int localX = ((x % 16) + 16) % 16;
+        int localZ = ((z % 16) + 16) % 16;
 
-    int localIndex =
-        localX +
-        localZ * 16 +
-        y * 16 * 16;
-
-    // TEMP:
-    // replace this with actual chunk->gpuLightIndex lookup later
-    int gpuLightIndex = 96;
-
-    int finalIndex =
-        gpuLightIndex * 32768 +
-        localIndex;
+        int localIndex =
+            localX +
+            localZ * 16 +
+            y * 16 * 16;
 
 
-    uint packedLightData = texelFetch(lightBuffer, finalIndex).r;
-
-    uint skyLight = (packedLightData >> 4u) & 15u;
-    uint blockLight = packedLightData & 15u;
-
-
-    float sky = float(skyLight) / 15.0;
-    float block = float(skyLight) / 15.0;
-    float brightness = sky;
+        int finalIndex =
+            fragGpuLightIndex * 32768 +
+            localIndex;
 
 
-    texColor.rgb *= brightness;
+        uint packedLightData = texelFetch(lightBuffer, finalIndex).r;
+
+        uint skyLight = (packedLightData >> 4u) & 15u;
+        uint blockLight = packedLightData & 15u;
+
+
+        float sky = float(skyLight) / 15.0;
+        float block = float(skyLight) / 15.0;
+        float brightness = max(sky, block);
+
+        texColor.rgb *= brightness;
+    }
+
 
     
 

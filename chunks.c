@@ -1222,14 +1222,14 @@ void computeSkylightForChunk(Chunk *chunk) {
 
                 uint8_t originalLight = chunk->lightData[index];
 
-                SET_SKYLIGHT(chunk->lightData[index], (uint8_t)(x+z));
+                SET_SKYLIGHT(chunk->lightData[index], (uint8_t)(currentLight));
 
                 if ((chunk->lightData[index] != originalLight) && chunk->isInitialLightCreated) {
                     chunk->lightDirty = 1;
                 }
 
                 if (!curBlock->isAir) {
-                    currentLight = (uint8_t)0;
+                    currentLight = (uint8_t)(max(0, currentLight - 3));
                 }
             }
         }

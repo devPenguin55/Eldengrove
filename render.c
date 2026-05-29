@@ -259,6 +259,7 @@ void initGraphics()
     glBindAttribLocation(worldShader, 0, "position");
     glBindAttribLocation(worldShader, 1, "texCoord");
     glBindAttribLocation(worldShader, 2, "layer");
+    glBindAttribLocation(worldShader, 3, "gpuLightIndex");
     glLinkProgram(worldShader);
 
     allChunkLighting = malloc(sizeof(uint8_t) * (2 * CHUNK_PRELOAD_RADIUS + 1) * (2 * CHUNK_PRELOAD_RADIUS + 1) * ChunkWidthX * ChunkHeightY * ChunkLengthZ);
@@ -515,6 +516,7 @@ void adjustVerticesForQuadData(
         v->x += x;
         v->y += y;
         v->z += z;
+        v->gpuLightIndex = chunkAtPosition(v->x, v->y, v->z)->gpuLightIndex;
     }
 }
 
@@ -792,8 +794,6 @@ void face(
         glPopMatrix();
         return;
     }
-
-    glEnd();
     glPopMatrix();
 }
 
@@ -1410,8 +1410,9 @@ void uploadWorldMesh()
     // layer attribute location
     glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)(offsetof(Vertex, layer)));
     glEnableVertexAttribArray(2);
-
-    glEnableVertexAttribArray(2);
+    
+    glVertexAttribIPointer(3, 1, GL_INT, sizeof(Vertex), (void*)offsetof(Vertex, gpuLightIndex));
+    glEnableVertexAttribArray(3);
 
     glBindVertexArray(0); // unbind
 
@@ -1444,7 +1445,8 @@ void uploadWorldMesh()
     glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void *)(offsetof(Vertex, layer)));
     glEnableVertexAttribArray(2);
 
-    glEnableVertexAttribArray(2);
+    glVertexAttribIPointer(3, 1, GL_INT, sizeof(Vertex), (void*)offsetof(Vertex, gpuLightIndex));
+    glEnableVertexAttribArray(3);
 
     glBindVertexArray(0); // unbind
 }
@@ -1613,10 +1615,11 @@ void drawGraphics()
 
     glUseProgram(0);
     glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
+    glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_BUFFER, 0);
     glDisable(GL_TEXTURE_2D);
     glDisable(GL_TEXTURE_2D_ARRAY);
-    glDisable(GL_TEXTURE_3D);
+    glDisable(GL_TEXTURE_3D);   
 
     for (int i = 0; i < 16; i++)
         glDisableVertexAttribArray(i);
@@ -1707,7 +1710,7 @@ void drawGraphics()
     glColor3f(1, 1, 1);
     drawText(text, 5, 15);
 
-    // glColor3f(1.0f, 1.0f, 1.0f);
+    glColor3f(1.0f, 1.0f, 1.0f);
 
     ////////////////////////////////////////
 
@@ -1768,38 +1771,41 @@ void drawGraphics()
 
         glUseProgram(worldShader);
         glBindAttribLocation(worldShader, 2, "layer");
+        glBindAttribLocation(worldShader, 3, "gpuLightIndex");
+        glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D_ARRAY, blockTextureArray);
 
         glBegin(GL_TRIANGLES);
+        layer = -55 + layer;
 
         glVertexAttrib2f(1, 0.0f, 0.0f);
         glVertexAttrib1f(2, layer);
-        glVertexAttrib1f(3, 1.0);
+        glVertexAttrib1d(3, 55555);
         glVertex2f(ix0, iy0);
 
         glVertexAttrib2f(1, 1.0f, 0.0f);
         glVertexAttrib1f(2, layer);
-        glVertexAttrib1f(3, 1.0);
+        glVertexAttrib1d(3, 55555);
         glVertex2f(ix1, iy0);
 
         glVertexAttrib2f(1, 1.0f, 1.0f);
         glVertexAttrib1f(2, layer);
-        glVertexAttrib1f(3, 1.0);
+        glVertexAttrib1d(3, 55555);
         glVertex2f(ix1, iy1);
 
         glVertexAttrib2f(1, 0.0f, 0.0f);
         glVertexAttrib1f(2, layer);
-        glVertexAttrib1f(3, 1.0);
+        glVertexAttrib1d(3, 55555);
         glVertex2f(ix0, iy0);
 
         glVertexAttrib2f(1, 1.0f, 1.0f);
         glVertexAttrib1f(2, layer);
-        glVertexAttrib1f(3, 1.0);
+        glVertexAttrib1d(3, 55555);
         glVertex2f(ix1, iy1);
 
         glVertexAttrib2f(1, 0.0f, 1.0f);
         glVertexAttrib1f(2, layer);
-        glVertexAttrib1f(3, 1.0);
+        glVertexAttrib1d(3, 55555);
         glVertex2f(ix0, iy1);
 
         glEnd();

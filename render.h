@@ -31,6 +31,7 @@ typedef struct Vertex
     float x, y, z; // position
     float u, v;    // texcoords
     float layer;
+    int gpuLightIndex;
 } Vertex;
 
 extern GLfloat T;

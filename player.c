@@ -4,6 +4,26 @@
 #include "chunkLoaderManager.h"
 #include "input.h"
 
+Chunk *chunkAtPosition(int voxelX, int voxelY, int voxelZ) {
+    int chunkX = (voxelX >= 0)
+        ? voxelX / ChunkWidthX
+        : (voxelX - (ChunkWidthX - 1)) / ChunkWidthX;
+
+    int chunkZ = (voxelZ >= 0)
+        ? voxelZ / ChunkLengthZ
+        : (voxelZ - (ChunkLengthZ - 1)) / ChunkLengthZ;
+
+    uint64_t chunkKey = packChunkKey(chunkX, chunkZ);
+    BucketEntry* result = getHashmapEntry(chunkKey);
+
+    if (!result) {
+        return NULL;
+    }
+
+    Chunk* chunk = result->chunkEntry;
+    return chunk;
+}
+
 Block *blockAtPosition(int voxelX, int voxelY, int voxelZ) {
     int chunkX = (voxelX >= 0)
         ? voxelX / ChunkWidthX
