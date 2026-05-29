@@ -14,7 +14,9 @@ void main()
 {
     int layer = int(fragLayer);
 
-    vec4 texColor;
+    vec4 texColor; 
+
+    // layer < 0 is for the UI to separate it from the normal rendering
     if (layer >= 0) {
         texColor = texture(blockTextures, vec3(fragUV, layer));
     } else {

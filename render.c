@@ -516,7 +516,7 @@ void adjustVerticesForQuadData(
         v->x += x;
         v->y += y;
         v->z += z;
-        v->gpuLightIndex = chunkAtPosition(v->x, v->y, v->z)->gpuLightIndex;
+        v->gpuLightIndex = chunkAtPosition(x,y,z)->gpuLightIndex;
     }
 }
 
