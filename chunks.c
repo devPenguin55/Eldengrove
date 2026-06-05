@@ -346,9 +346,6 @@ static inline int checkIfFaceValidToBeInMesh(Block *mainBlock, Block *neighborBl
     if (mainBlock->isAir)
         return 0;
 
-  
-    
-
     if (!mainBlock->isAir && !neighborBlock->isAir && !blockRegistry[mainBlock->blockType].isRenderSolid && !blockRegistry[neighborBlock->blockType].isRenderSolid && mainBlock->blockType != BLOCK_TYPE_WATER && neighborBlock->blockType != BLOCK_TYPE_WATER)
     {
         return 1;
@@ -380,8 +377,6 @@ static inline int checkIfFaceValidToBeInMesh(Block *mainBlock, Block *neighborBl
 
         return 0;
     }
-
-    
 
     return 0;
 }

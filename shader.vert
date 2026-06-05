@@ -6,13 +6,11 @@ layout(location = 2) in float layer;
 layout(location = 3) in int gpuLightIndex;
 layout(location = 4) in int face;
 
-
 out vec2 fragUV;
 flat out float fragLayer;
 out vec3 worldPos;
 flat out int fragGpuLightIndex;
 flat out int fragFace;
-
 void main()
 {
     fragUV = texCoord;

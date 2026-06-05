@@ -524,6 +524,7 @@ void adjustVerticesForQuadData(
 {
     Vertex *verts[4] = {v0, v1, v2, v3};
 
+    
     for (int i = 0; i < 4; i++)
     {
         Vertex *v = verts[i];
@@ -536,36 +537,39 @@ void adjustVerticesForQuadData(
         int sampleX = (int)x;
         int sampleY = (int)y;
         int sampleZ = (int)z;
+
         switch (face)
         {
             case FACE_TOP:
-                sampleY -= 1;
                 break;
 
             case FACE_BOTTOM:
-                sampleY += 1;
                 break;
 
             case FACE_LEFT:
-                sampleX += 1;
-                break;
-
-            case FACE_RIGHT:
                 sampleX -= 1;
                 break;
 
+            case FACE_RIGHT:
+                sampleX += 1;
+                break;
+
             case FACE_FRONT:
-                sampleZ += 1;
+                sampleZ -= 1;
                 break;
 
             case FACE_BACK:
-                sampleZ -= 1;
+                sampleZ += 1;
                 break;
         }
 
+        v->gpuLightIndex = chunkAtPosition(sampleX,sampleY,sampleZ)->gpuLightIndex;  
 
-        v->gpuLightIndex = chunkAtPosition(x,y,z)->gpuLightIndex;
         v->face = face;
+
+
+        
+
     }
 }
 
@@ -1470,6 +1474,7 @@ void uploadWorldMesh()
     glVertexAttribIPointer(4, 1, GL_INT, sizeof(Vertex), (void*)offsetof(Vertex, face));
     glEnableVertexAttribArray(4);
 
+
     glBindVertexArray(0); // unbind
 
     // * ////////////////////////////////////////////////////////
@@ -1608,27 +1613,27 @@ void drawGraphics()
             for (int dy = 0; dy <= 50; dy++)
             {
                 glBegin(GL_LINE_LOOP);
-                glVertex3f(chunk->chunkStartX, ChunkHeightY * dy / 50.0f, chunk->chunkStartZ);
-                glVertex3f(chunk->chunkStartX, ChunkHeightY * dy / 50.0f, chunk->chunkStartZ + ChunkLengthZ);
-                glVertex3f(chunk->chunkStartX + ChunkWidthX, ChunkHeightY * dy / 50.0f, chunk->chunkStartZ + ChunkLengthZ);
-                glVertex3f(chunk->chunkStartX + ChunkWidthX, ChunkHeightY * dy / 50.0f, chunk->chunkStartZ);
+                glVertex3f(chunk->chunkStartX+0.5, ChunkHeightY * dy / 50.0f+0.5, chunk->chunkStartZ+0.5);
+                glVertex3f(chunk->chunkStartX+0.5, ChunkHeightY * dy / 50.0f+0.5, chunk->chunkStartZ + ChunkLengthZ+0.5);
+                glVertex3f(chunk->chunkStartX+0.5 + ChunkWidthX, ChunkHeightY * dy / 50.0f+0.5, chunk->chunkStartZ + ChunkLengthZ+0.5);
+                glVertex3f(chunk->chunkStartX+0.5 + ChunkWidthX, ChunkHeightY * dy / 50.0f+0.5, chunk->chunkStartZ+0.5);
                 glEnd();
             }
             glBegin(GL_LINES);
             for (int dx = 0; dx <= 5; dx++)
             {
-                glVertex3f(chunk->chunkStartX + ChunkWidthX * dx / 5.0f, 0, chunk->chunkStartZ);
-                glVertex3f(chunk->chunkStartX + ChunkWidthX * dx / 5.0f, ChunkHeightY, chunk->chunkStartZ);
-                glVertex3f(chunk->chunkStartX + ChunkWidthX * dx / 5.0f, 0, chunk->chunkStartZ + ChunkLengthZ);
-                glVertex3f(chunk->chunkStartX + ChunkWidthX * dx / 5.0f, ChunkHeightY, chunk->chunkStartZ + ChunkLengthZ);
+                glVertex3f(chunk->chunkStartX+0.5 + ChunkWidthX * dx / 5.0f, 0.5, chunk->chunkStartZ+0.5);
+                glVertex3f(chunk->chunkStartX+0.5 + ChunkWidthX * dx / 5.0f, ChunkHeightY+0.5, chunk->chunkStartZ+0.5);
+                glVertex3f(chunk->chunkStartX+0.5 + ChunkWidthX * dx / 5.0f, 0.5, chunk->chunkStartZ + ChunkLengthZ+0.5);
+                glVertex3f(chunk->chunkStartX+0.5 + ChunkWidthX * dx / 5.0f, ChunkHeightY+0.5, chunk->chunkStartZ + ChunkLengthZ+0.5);
             }
 
             for (int dz = 0; dz <= 5; dz++)
             {
-                glVertex3f(chunk->chunkStartX + ChunkWidthX, 0, chunk->chunkStartZ + ChunkLengthZ * dz / 5.0f);
-                glVertex3f(chunk->chunkStartX + ChunkWidthX, ChunkHeightY, chunk->chunkStartZ + ChunkLengthZ * dz / 5.0f);
-                glVertex3f(chunk->chunkStartX, 0, chunk->chunkStartZ + ChunkLengthZ * dz / 5.0f);
-                glVertex3f(chunk->chunkStartX, ChunkHeightY, chunk->chunkStartZ + ChunkLengthZ * dz / 5.0f);
+                glVertex3f(chunk->chunkStartX+0.5 + ChunkWidthX, 0.5, chunk->chunkStartZ + ChunkLengthZ * dz / 5.0f+0.5);
+                glVertex3f(chunk->chunkStartX+0.5 + ChunkWidthX, ChunkHeightY+0.5, chunk->chunkStartZ + ChunkLengthZ * dz / 5.0f+0.5);
+                glVertex3f(chunk->chunkStartX+0.5, 0.5, chunk->chunkStartZ + ChunkLengthZ * dz / 5.0f+0.5);
+                glVertex3f(chunk->chunkStartX+0.5, ChunkHeightY+0.5, chunk->chunkStartZ + ChunkLengthZ * dz / 5.0f+0.5);
             }
             glEnd();
         }

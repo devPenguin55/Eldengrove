@@ -56,7 +56,16 @@ void initGraphics();
 void createWorldLightingDataFromAllChunks();
 void reshape(int width, int height);
 void spinObject();
-void adjustVerticesForQuadData(Vertex *v0, Vertex *v1, Vertex *v2, Vertex *v3, float x, float y, float z, int face);
+void adjustVerticesForQuadData(
+    Vertex *v0, 
+    Vertex *v1, 
+    Vertex *v2, 
+    Vertex *v3, 
+    float x, 
+    float y, 
+    float z, 
+    int face
+);
 void face(
     GLfloat A[3],
     GLfloat B[3],

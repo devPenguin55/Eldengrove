@@ -5,11 +5,10 @@ flat in float fragLayer;
 in vec3 worldPos;
 flat in int fragGpuLightIndex;
 flat in int fragFace;
-
 out vec4 fragColor;
 
 uniform sampler2DArray blockTextures;
-uniform usamplerBuffer lightBuffer;
+uniform usamplerBuffer lightBuffer; // for all render chunks in one
 
 #define FACE_TOP 1
 #define FACE_BOTTOM 2
@@ -28,7 +27,6 @@ float getLight(int x, int y, int z)
         localX +
         localZ * 16 +
         y * 16 * 16;
-
 
     int finalIndex =
         fragGpuLightIndex * 32768 +
@@ -75,6 +73,7 @@ void main()
     } else {        
         vec3 samplePos = worldPos;
 
+        // first adjust the vertex that is on the half-voxel coordinates to the normal voxel coordinates
         switch (fragFace)
         {
             case FACE_TOP:
@@ -106,6 +105,7 @@ void main()
         float y = round(samplePos.y);
         float z = round(samplePos.z);
 
+        // now sample for the neighboring block lighting to get the correct lighting for the face
         switch (fragFace)
         {
             case FACE_TOP:
