@@ -6,67 +6,76 @@
 
 typedef struct Block
 {
-    GLfloat x;
-    GLfloat y;
-    GLfloat z;
-    int isAir;
+    GLfloat     x;
+    GLfloat     y;
+    GLfloat     z;
+    int     isAir;
     int blockType; // the block type for selecting the texture later
 } Block;
 
 typedef struct Chunk
 {
     Block blocks[16 * 16 * 128];
-    uint8_t *lightData; // for each, Upper 4 bits -> skylight, Lower 4 bits -> blockLight
-    GLfloat chunkStartX;
-    GLfloat chunkStartZ;
-    int firstQuadIndex;
-    int lastQuadIndex;
-    int flag;
-    int hasMesh;
-    uint64_t key;
-    int hasVertices;
-    int hasWaterVertices;
-    int firstVertex;
-    int lastVertex;
-    int firstWaterVertex;
-    int lastWaterVertex;
-    int triggerVertexDeletion;
+    uint8_t          *lightData; // for each, Upper 4 bits -> skylight, Lower 4 bits -> blockLight
+    GLfloat         chunkStartX;
+    GLfloat         chunkStartZ;
+    int          firstQuadIndex;
+    int           lastQuadIndex;
+    int                    flag;
+    int                 hasMesh;
+    uint64_t                key;
+    int             hasVertices;
+    int        hasWaterVertices;
+    int             firstVertex;
+    int              lastVertex;
+    int        firstWaterVertex;
+    int         lastWaterVertex;
+    int   triggerVertexDeletion;
     int triggerVertexRecreation;
-    int isDirty;
-    int lightDirty;
-    int gpuLightIndex;
-    int isInitialLightCreated;
+    int                 isDirty;
+    int              lightDirty;
+    int           gpuLightIndex;
+    int   isInitialLightCreated;
 } Chunk;
 
 typedef struct MeshQuad
 {
-    GLfloat x;
-    GLfloat y;
-    GLfloat z;
-    GLfloat width;
+    GLfloat      x;
+    GLfloat      y;
+    GLfloat      z;
+    GLfloat  width;
     GLfloat height;
-    int faceType;  // these are listed below!
-    int blockType; // these are listed below!
+    int   faceType;  // these are listed below!
+    int  blockType; // these are listed below!
 } MeshQuad;
 
 typedef struct ChunkMeshQuads
 {
     MeshQuad *quads;
-    int capacity;
-    int amtQuads;
+    int    capacity;
+    int    amtQuads;
 } ChunkMeshQuads;
 
 typedef struct BlockType
 {
-    int id; // essentially BLOCK_TYPE_GRASS or smt
-    int topTexture;
-    int bottomTexture;
-    int sideTexture;
-    int isRenderSolid;
+    int                  id; // essentially BLOCK_TYPE_GRASS or smt
+    int          topTexture;
+    int       bottomTexture;
+    int         sideTexture;
+    int       isRenderSolid;
     float blockBreakingTime;
-    int isRenderCross;
-    int isPhysicsSolid;
+    int       isRenderCross;
+    int      isPhysicsSolid;
 } BlockType;
+
+typedef struct Queue 
+{
+    Block *items[250];
+    int         front;
+    int          rear;
+    int      capacity;
+    int          size;
+} Queue;
 
 // these are the face types
 #define FACE_TOP 1
@@ -123,6 +132,7 @@ void initChunkMeshingSystem();
 void handleProgramClose();
 void generateChunkMesh(Chunk *chunk);
 void deleteChunkMesh(Chunk *chunk);
+void initLightingQueue(Queue *queue);
 void computeSkylightForChunk(Chunk *chunk);
 
 #endif
