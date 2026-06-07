@@ -38,7 +38,7 @@ void saveChunkToDisk(Chunk *chunk) {
     fwrite(&copyChunk, sizeof(Chunk), 1, file);
     printf("Saved chunk %" PRIu64 " to disk\n", chunk->key);
     fclose(file);
-}
+} 
 
 void fetchChunkFromDisk(int chunkX, int chunkZ, Chunk *writeChunk) {
     return;

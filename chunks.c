@@ -12,7 +12,7 @@
 
 ChunkMeshQuads chunkMeshQuads;
 BlockType blockRegistry[100];
-Queue lightingQueue;
+// Queue lightingQueue;
 // int ChunkWidthX = 1;
 // int ChunkLengthZ = 1;
 // int ChunkHeightY = 10;
@@ -21,7 +21,7 @@ float BlockWidthX = 1;
 float BlockHeightY = 1;
 float BlockLengthZ = 1;
 
-int DEBUG = 0;
+int DEBUG_MODE = 0;
 
 
 
@@ -50,6 +50,7 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
     chunk->gpuLightIndex = -1;
 
     chunk->lightData = malloc(sizeof(uint8_t)*ChunkWidthX*ChunkLengthZ*ChunkHeightY);
+    memset(chunk->lightData, 0, sizeof(uint8_t) * ChunkWidthX * ChunkLengthZ * ChunkHeightY);
     chunk->isInitialLightCreated = 0;
 
     for (int x = 0; x < ChunkWidthX; x++)
@@ -153,8 +154,8 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
                 }
 
                 // ! REMOVE 
-                // curBlock->blockType = BLOCK_TYPE_DIRT;
-                // curBlock->isAir = y > 50;
+                curBlock->blockType = BLOCK_TYPE_DIRT;
+                curBlock->isAir = y > 50;
                 // curBlock->isAir = (int)(y/2) > (int)(0.5*(40+x/2+z/2));
             }
         }
@@ -335,7 +336,7 @@ void initChunkMeshingSystem()
     chunkMeshQuads.amtQuads = 0;
     chunkMeshQuads.quads = malloc(sizeof(MeshQuad) * chunkMeshQuads.capacity);
 
-    initLightingQueue(&lightingQueue);
+    // initLightingQueue(&lightingQueue);
 }
 
 void handleProgramClose()
@@ -426,7 +427,7 @@ void generateChunkMesh(Chunk *chunk)
     //     printf("down neighbor null\n");
     // }
 
-    if (DEBUG)
+    if (DEBUG_MODE)
     {
         printf("X %d and Y %d\n", chunkX, chunkZ);
         printf("Up neighbor is chunkKey = %" PRIu64 "\n", upChunkNeighborKey);
@@ -603,7 +604,7 @@ void generateChunkMesh(Chunk *chunk)
 
                 chunkMeshQuads.amtQuads++;
                 // printf("  -> %f, %f\n", x, chunk->chunkStartX);
-                if (DEBUG)
+                if (DEBUG_MODE)
                 {
                     printf("[CREATED QUAD] x %f, y %f, z %f, width %d, height %d, faceType %d, blockType %d\n", curQuad->x, curQuad->y, curQuad->z, width, height, curQuad->faceType, curQuad->blockType);
                 }
@@ -679,7 +680,7 @@ void generateChunkMesh(Chunk *chunk)
                 curQuad->blockType = curBlockType;
 
                 chunkMeshQuads.amtQuads++;
-                if (DEBUG)
+                if (DEBUG_MODE)
                 {
                     printf("[CREATED QUAD] x %f, y %f, z %f, width %d, height %d, faceType %d, blockType %d\n", curQuad->x, curQuad->y, curQuad->z, width, height, curQuad->faceType, curQuad->blockType);
                 }
@@ -791,7 +792,7 @@ void generateChunkMesh(Chunk *chunk)
                 curQuad->blockType = curBlockType;
 
                 chunkMeshQuads.amtQuads++;
-                if (DEBUG)
+                if (DEBUG_MODE)
                 {
                     printf("[CREATED QUAD] x %f, y %f, z %f, width %d, height %d, faceType %d, blockType %d\n", curQuad->x, curQuad->y, curQuad->z, width, height, curQuad->faceType, curQuad->blockType);
                 }
@@ -898,7 +899,7 @@ void generateChunkMesh(Chunk *chunk)
                 curQuad->blockType = curBlockType;
 
                 chunkMeshQuads.amtQuads++;
-                if (DEBUG)
+                if (DEBUG_MODE)
                 {
                     printf("[CREATED QUAD] x %f, y %f, z %f, width %d, height %d, faceType %d, blockType %d\n", curQuad->x, curQuad->y, curQuad->z, width, height, curQuad->faceType, curQuad->blockType);
                 }
@@ -1006,7 +1007,7 @@ void generateChunkMesh(Chunk *chunk)
                 curQuad->blockType = curBlockType;
 
                 chunkMeshQuads.amtQuads++;
-                if (DEBUG)
+                if (DEBUG_MODE)
                 {
                     printf("[CREATED QUAD] x %f, y %f, z %f, width %d, height %d, faceType %d, blockType %d\n", curQuad->x, curQuad->y, curQuad->z, width, height, curQuad->faceType, curQuad->blockType);
                 }
@@ -1114,7 +1115,7 @@ void generateChunkMesh(Chunk *chunk)
                 curQuad->blockType = curBlockType;
 
                 chunkMeshQuads.amtQuads++;
-                if (DEBUG)
+                if (DEBUG_MODE)
                 {
                     printf("[CREATED QUAD] x %f, y %f, z %f, width %d, height %d, faceType %d, blockType %d\n", curQuad->x, curQuad->y, curQuad->z, width, height, curQuad->faceType, curQuad->blockType);
                 }
@@ -1152,7 +1153,7 @@ void generateChunkMesh(Chunk *chunk)
                 curQuad->blockType = block->blockType;
 
                 chunkMeshQuads.amtQuads++;
-                if (DEBUG)
+                if (DEBUG_MODE)
                 {
                     printf("[CREATED QUAD] x %f, y %f, z %f, width %d, height %d, faceType %d, blockType %d\n", curQuad->x, curQuad->y, curQuad->z, width, height, curQuad->faceType, curQuad->blockType);
                 }
@@ -1246,15 +1247,13 @@ void computeSkylightForChunk(Chunk *chunk) {
     // should only be called after chunk + neighbor chunks loaded
     // this is the light baking step
 
-    lightingQueue.front = 0;
-    lightingQueue.rear = 0;
-    lightingQueue.size = 0;
+    // lightingQueue.front = 0;
+    // lightingQueue.rear = 0;
+    // lightingQueue.size = 0;
 
     for (int x = 0; x < ChunkWidthX; x++) {
         for (int z = 0; z < ChunkLengthZ; z++) {
-            //                     X  X  
-            //            
-            uint8_t currentLight = ((x == 0 && z==ChunkLengthZ-1)|| (x==1 && z==ChunkLengthZ-1)|| (x == 0 && z==ChunkLengthZ-3)) ? 5 : 9;
+            uint8_t currentLight = 9;
             for (int y = ChunkHeightY - 1; y >= 0; y--) {
                 int index = x + z * (ChunkWidthX) + y * (ChunkWidthX * ChunkLengthZ);
                 Block *curBlock = &chunk->blocks[index];
@@ -1269,7 +1268,6 @@ void computeSkylightForChunk(Chunk *chunk) {
 
                 if (curBlock->blockType == BLOCK_TYPE_TORCH) {
                     SET_BLOCK_LIGHT(chunk->lightData[index], (uint8_t)(15));
-                    currentLight = 15;
                 } else {
                     SET_SKYLIGHT(chunk->lightData[index], (uint8_t)(currentLight));
                 }
@@ -1289,7 +1287,7 @@ void computeSkylightForChunk(Chunk *chunk) {
         }
     } 
 
-
+    chunk->lightDirty = 1;
     // while (lightingQueue.size > 0) {
     //     Block *block = dequeue(&lightingQueue);
 

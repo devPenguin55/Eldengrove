@@ -102,6 +102,7 @@ void writeHashmapEntry(uint64_t key, int chunkX, int chunkZ, int exists)
         if (chunkLoaderManager.amtFreeSlots <= 0)
         {
             printf("No free GPU light slots!\n");
+            fflush(stdout);
             exit(1);
         }
         int slot = chunkLoaderManager.freeSlots[--chunkLoaderManager.amtFreeSlots];
@@ -142,6 +143,7 @@ void writeHashmapEntry(uint64_t key, int chunkX, int chunkZ, int exists)
     if (chunkLoaderManager.amtFreeSlots <= 0)
     {
         printf("No free GPU light slots!\n");
+        fflush(stdout);
         exit(1);
     }
     int slot = chunkLoaderManager.freeSlots[--chunkLoaderManager.amtFreeSlots];
@@ -191,6 +193,7 @@ void deleteHashmapEntry(uint64_t key)
     if (chunkLoaderManager.amtFreeSlots >= (2*CHUNK_PRELOAD_RADIUS+1)*(2*CHUNK_PRELOAD_RADIUS+1))
     {
         printf("Free slot overflow!\n");
+        fflush(stdout);
         exit(1);
     }
     chunkLoaderManager.freeSlots[chunkLoaderManager.amtFreeSlots++] = currentNode->chunkEntry->gpuLightIndex;
