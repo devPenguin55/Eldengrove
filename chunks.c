@@ -1246,13 +1246,60 @@ QueueEntry *dequeue(Queue *queue) {
     return result;
 }
 
+
+void propagateLightBFS() { // seed the lighting queue beforehand (note to self to reset the lighting queue first)
+    Vec3 neighborShift[] = {
+        {-1, 0, 0},
+        {1, 0, 0},
+        {0, -1, 0},
+        {0, 1, 0},
+        {0, 0, 1},
+        {0, 0, -1}
+    };
+
+    
+    while (lightingQueue.size > 0) { 
+        QueueEntry *queueEntry = dequeue(&lightingQueue); 
+        if (queueEntry == NULL) { continue; } 
+        
+        Chunk *curLightingChunk = chunkAtPosition(queueEntry->x, queueEntry->y, queueEntry->z);
+        curLightingChunk->lightDirty = 1;
+        int blockIndex = ((int)queueEntry->x - curLightingChunk->chunkStartX) + ((int)queueEntry->z - curLightingChunk->chunkStartZ) * ChunkWidthX + (int)queueEntry->y * ChunkWidthX * ChunkLengthZ; 
+        
+        if (GET_BLOCK_LIGHT(curLightingChunk->lightData[blockIndex]) == 0) { continue; } 
+        
+        int neighborIndex; 
+        int traversingWorldX = queueEntry->x;
+        int traversingWorldY = queueEntry->y;
+        int traversingWorldZ = queueEntry->z;
+
+        for (int i = 0; i < 6; i++) {
+            int nx = traversingWorldX + (int)neighborShift[i].x;
+            int ny = traversingWorldY + (int)neighborShift[i].y;
+            int nz = traversingWorldZ + (int)neighborShift[i].z;
+
+            if (ny < 0 || ny >= ChunkHeightY) {
+                continue;
+            }
+
+            Chunk *neighborLightingChunk = chunkAtPosition(nx, ny, nz);
+            neighborIndex = (nx - neighborLightingChunk->chunkStartX) + (nz - neighborLightingChunk->chunkStartZ) * ChunkWidthX + ny * ChunkWidthX * ChunkLengthZ; 
+        
+            
+            if ((GET_BLOCK_LIGHT(neighborLightingChunk->lightData[neighborIndex]) >= (GET_BLOCK_LIGHT(curLightingChunk->lightData[blockIndex])-1))) { continue; }
+            neighborLightingChunk->lightDirty = 1;
+
+            neighborLightingChunk->lightData[neighborIndex] = SET_BLOCK_LIGHT(neighborLightingChunk->lightData[neighborIndex], GET_BLOCK_LIGHT(curLightingChunk->lightData[blockIndex])-1); 
+            enqueue(&lightingQueue, neighborLightingChunk->blocks[neighborIndex].x, neighborLightingChunk->blocks[neighborIndex].y, neighborLightingChunk->blocks[neighborIndex].z); 
+        }
+    }
+}
+
 void computeSkylightForChunk(Chunk *chunk) {
     // should only be called after chunk + neighbor chunks loaded
     // this is the light baking step
 
-    lightingQueue.front = 0;
-    lightingQueue.rear = 0;
-    lightingQueue.size = 0;
+    initLightingQueue(&lightingQueue);
     
     for (int x = 0; x < ChunkWidthX; x++) {
         for (int z = 0; z < ChunkLengthZ; z++) {
@@ -1264,7 +1311,7 @@ void computeSkylightForChunk(Chunk *chunk) {
                 uint8_t originalLight = chunk->lightData[index];
 
                 if (curBlock->blockType == BLOCK_TYPE_TORCH && !curBlock->isAir) {
-                    SET_BLOCK_LIGHT(chunk->lightData[index], (uint8_t)(15));
+                    if (!chunk->isInitialLightCreated) { SET_BLOCK_LIGHT(chunk->lightData[index], (uint8_t)(15)); }
                     SET_SKYLIGHT(chunk->lightData[index], (uint8_t)(0));
                     
                     enqueue(&lightingQueue, 
@@ -1274,7 +1321,7 @@ void computeSkylightForChunk(Chunk *chunk) {
                     );
                 } else {
                     SET_SKYLIGHT(chunk->lightData[index], (uint8_t)(currentLight));
-                    SET_BLOCK_LIGHT(chunk->lightData[index], (uint8_t)(0));
+                    if (!chunk->isInitialLightCreated) { SET_BLOCK_LIGHT(chunk->lightData[index], (uint8_t)(0)); }
                 }
 
 
@@ -1290,54 +1337,7 @@ void computeSkylightForChunk(Chunk *chunk) {
 
     chunk->lightDirty = 1;
 
-
-
-    Vec3 neighborShift[] = {
-        {-1, 0, 0},
-        {1, 0, 0},
-        {0, -1, 0},
-        {0, 1, 0},
-        {0, 0, 1},
-        {0, 0, -1}
-    };
-
-    
-    while (lightingQueue.size > 0) { 
-        QueueEntry *queueEntry = dequeue(&lightingQueue); 
-        if (queueEntry == NULL) { continue; } 
-        int blockIndex = ((int)queueEntry->x - chunk->chunkStartX) + ((int)queueEntry->z - chunk->chunkStartZ) * ChunkWidthX + (int)queueEntry->y * ChunkWidthX * ChunkLengthZ; 
-        
-        if (GET_BLOCK_LIGHT(chunk->lightData[blockIndex]) == 0) { continue; } 
-        
-        int neighborIndex; 
-        int localX = queueEntry->x - chunk->chunkStartX;
-        int localY = queueEntry->y;
-        int localZ = queueEntry->z - chunk->chunkStartZ;
-
-        for (int i = 0; i < 6; i++) {
-            int nx = localX + (int)neighborShift[i].x;
-            int ny = localY + (int)neighborShift[i].y;
-            int nz = localZ + (int)neighborShift[i].z;
-
-            if (
-                nx < 0 || nx >= ChunkWidthX ||
-                ny < 0 || ny >= ChunkHeightY ||
-                nz < 0 || nz >= ChunkLengthZ
-            ) {
-                continue;
-            }
-
-            int neighborIndex =
-                nx +
-                nz * ChunkWidthX +
-                ny * ChunkWidthX * ChunkLengthZ; 
-            
-            if ((GET_BLOCK_LIGHT(chunk->lightData[neighborIndex]) >= (GET_BLOCK_LIGHT(chunk->lightData[blockIndex])-1))) { continue; }
-
-            chunk->lightData[neighborIndex] = SET_BLOCK_LIGHT(chunk->lightData[neighborIndex], GET_BLOCK_LIGHT(chunk->lightData[blockIndex])-1); 
-            enqueue(&lightingQueue, chunk->blocks[neighborIndex].x, chunk->blocks[neighborIndex].y, chunk->blocks[neighborIndex].z); 
-        }
-    }
+    propagateLightBFS();
 
     chunk->isInitialLightCreated = 1;
 } 

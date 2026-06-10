@@ -114,7 +114,6 @@ void handleMouse(int button, int state, int x_, int y_)
         else
         {
             // place blocks
-
             if (hotbarBlocks[hotbarActiveSlot] == -1)
             {
                 return;
@@ -301,7 +300,14 @@ void handleMouse(int button, int state, int x_, int y_)
                     triggerRenderChunkRebuild(result->chunkEntry);
                 }
             }
+
             triggerRenderChunkRebuild(selectedBlockToRender.chunk);
+
+            initLightingQueue(&lightingQueue);
+            selectedBlockToRender.chunk->lightData[blockIndex] = (uint8_t)15;
+            enqueue(&lightingQueue, x+chunkXUnit, y, z+chunkZUnit);
+
+            propagateLightBFS();
         }
     }
     else

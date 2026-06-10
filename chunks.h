@@ -130,7 +130,7 @@ extern float BlockWidthX;
 extern float BlockLengthZ;
 extern float BlockHeightY;
 extern ChunkMeshQuads chunkMeshQuads;
-
+extern Queue lightingQueue;
 extern BlockType blockRegistry[100];
 
 void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, int flag, uint64_t key);
@@ -139,6 +139,10 @@ void handleProgramClose();
 void generateChunkMesh(Chunk *chunk);
 void deleteChunkMesh(Chunk *chunk);
 void initLightingQueue(Queue *queue);
+void initLightingQueue(Queue *queue);
+void enqueue(Queue *queue, int worldX, int worldY, int worldZ);
+QueueEntry *dequeue(Queue *queue);
+void propagateLightBFS();
 void computeSkylightForChunk(Chunk *chunk);
 
 #endif
