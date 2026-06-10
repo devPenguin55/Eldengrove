@@ -68,13 +68,19 @@ typedef struct BlockType
     int      isPhysicsSolid;
 } BlockType;
 
+typedef struct QueueEntry {
+    int x;
+    int y;
+    int z;
+} QueueEntry;
+
 typedef struct Queue 
 {
-    Block *items[250];
-    int         front;
-    int          rear;
-    int      capacity;
-    int          size;
+    QueueEntry  items[250];
+    int              front;
+    int               rear;
+    int           capacity;
+    int               size;
 } Queue;
 
 // these are the face types
