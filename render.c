@@ -197,7 +197,7 @@ int isCameraInWater()
 
     uint64_t chunkKey = packChunkKey(chunkX, chunkZ);
     BucketEntry *result = getHashmapEntry(chunkKey);
-    if (!result)
+    if (result == NULL)
     { 
         return 0;
     };
@@ -563,7 +563,7 @@ void adjustVerticesForQuadData(
         // printf("%d\n",((sampleZ % 16) + 16) % 16);
         switch (face)
         {
-            case FACE_TOP:
+            case FACE_TOP: 
                 break;
 
             case FACE_BOTTOM:

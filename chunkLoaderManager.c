@@ -75,6 +75,8 @@ BucketEntry *getHashmapEntry(uint64_t key)
     BucketEntry *currentNode = bucket->head;
     while (currentNode != NULL)
     {
+        // printf("key = %" PRIu64 "\n", key);
+        // printf("current node key = %" PRIu64 "\n\n", currentNode->key);
         if (currentNode->key == key)
         {
             if (currentNode->chunkEntry == NULL)
@@ -94,9 +96,9 @@ void writeHashmapEntry(uint64_t key, int chunkX, int chunkZ, int exists)
 
     if (bucket->head == NULL)
     {
-        bucket->head = malloc(sizeof(BucketEntry));
+        bucket->head = calloc(1, sizeof(BucketEntry));
         bucket->head->key = key;
-        bucket->head->chunkEntry = malloc(sizeof(Chunk)); // allocate the chunk
+        bucket->head->chunkEntry = calloc(1, sizeof(Chunk)); // allocate the chunk
         createChunk(bucket->head->chunkEntry, chunkX * (ChunkWidthX * BlockWidthX), chunkZ * (ChunkLengthZ * BlockLengthZ), 1, CHUNK_FLAG_LOADED, key);
         
         if (chunkLoaderManager.amtFreeSlots <= 0)
@@ -134,10 +136,10 @@ void writeHashmapEntry(uint64_t key, int chunkX, int chunkZ, int exists)
         }
         currentNode = currentNode->next;
     }
-    currentNode->next = malloc(sizeof(BucketEntry));
+    currentNode->next = calloc(1, sizeof(BucketEntry));
     currentNode = currentNode->next; // move to the new node
     currentNode->key = key;
-    currentNode->chunkEntry = malloc(sizeof(Chunk)); // allocate the chunk
+    currentNode->chunkEntry = calloc(1, sizeof(Chunk)); // allocate the chunk
     createChunk(currentNode->chunkEntry, chunkX * ChunkWidthX * BlockWidthX, chunkZ * ChunkLengthZ * BlockLengthZ, 1, CHUNK_FLAG_LOADED, key);
     
     if (chunkLoaderManager.amtFreeSlots <= 0)

@@ -45,7 +45,7 @@ void raycastFromCamera() {
 
         uint64_t chunkKey = packChunkKey(chunkX, chunkZ);
         BucketEntry* result = getHashmapEntry(chunkKey);
-        if (!result) break;
+        if (result == NULL) break;
 
         curChunk = result->chunkEntry;
         int index = localX + ChunkWidthX * localZ + (ChunkWidthX*ChunkLengthZ)*localY;

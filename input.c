@@ -120,7 +120,7 @@ void blockPlacingOrBreakingLightingRecalculation()
         }
     }
 
-    propagateLightBFS();
+    propagateLightBFS(1);
 }
 
 void handleMouse(int button, int state, int x_, int y_)

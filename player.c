@@ -4,8 +4,10 @@
 #include "chunkLoaderManager.h"
 #include "input.h"
 
-
 Chunk *chunkAtPosition(int voxelX, int voxelY, int voxelZ) {
+    int playerChunkX = (int)floor(player.position.x / (ChunkWidthX * BlockWidthX));
+    int playerChunkZ = (int)floor(player.position.z / (ChunkLengthZ * BlockLengthZ));
+
     int chunkX = (voxelX >= 0)
         ? voxelX / ChunkWidthX
         : (voxelX - (ChunkWidthX - 1)) / ChunkWidthX;
@@ -14,10 +16,18 @@ Chunk *chunkAtPosition(int voxelX, int voxelY, int voxelZ) {
         ? voxelZ / ChunkLengthZ
         : (voxelZ - (ChunkLengthZ - 1)) / ChunkLengthZ;
 
+    if (
+        (chunkX > (playerChunkX + CHUNK_PRELOAD_RADIUS) || (chunkX < (playerChunkX - CHUNK_PRELOAD_RADIUS))) ||
+        (chunkZ > (playerChunkZ + CHUNK_PRELOAD_RADIUS) || (chunkZ < (playerChunkZ - CHUNK_PRELOAD_RADIUS))))
+    { 
+        return NULL;
+    }
+
+    
     uint64_t chunkKey = packChunkKey(chunkX, chunkZ);
     BucketEntry* result = getHashmapEntry(chunkKey);
 
-    if (!result) {
+    if (result == NULL) {
         return NULL;
     }
 
@@ -41,7 +51,7 @@ Block *blockAtPosition(int voxelX, int voxelY, int voxelZ) {
     uint64_t chunkKey = packChunkKey(chunkX, chunkZ);
     BucketEntry* result = getHashmapEntry(chunkKey);
 
-    if (!result) {
+    if (result == NULL) {
         return NULL;
     }
 

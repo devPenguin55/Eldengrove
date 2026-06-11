@@ -49,8 +49,7 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
 
     chunk->gpuLightIndex = -1;
 
-    chunk->lightData = malloc(sizeof(uint8_t)*ChunkWidthX*ChunkLengthZ*ChunkHeightY);
-    memset(chunk->lightData, 0, sizeof(uint8_t) * ChunkWidthX * ChunkLengthZ * ChunkHeightY);
+    chunk->lightData = calloc(1, sizeof(uint8_t)*ChunkWidthX*ChunkLengthZ*ChunkHeightY);
     chunk->isInitialLightCreated = 0;
 
     for (int x = 0; x < ChunkWidthX; x++)
@@ -220,6 +219,13 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
                 continue;
             }
 
+            // ! remove
+            Block *b = &(chunk->blocks[x + ChunkWidthX * z + (ChunkWidthX * ChunkLengthZ) * surfaceY]);
+
+            b->blockType = BLOCK_TYPE_TORCH;
+            b->isAir = 0;
+            continue;
+
             int trunkHeight = 5 + (int)(fbm2D(worldX, worldZ, 1, 1, 1, 1) * 2);
 
             for (int yAdd = 0; yAdd < trunkHeight; yAdd++)
@@ -327,7 +333,7 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
         }
     }
 
-    computeSkylightForChunk(chunk);
+    // computeSkylightForChunk(chunk);
 }
 
 void initChunkMeshingSystem()
@@ -1248,8 +1254,27 @@ QueueEntry *dequeue(Queue *queue) {
     return result;
 }
 
+static inline uint8_t getSkylight(uint8_t b)
+{
+    return (b >> 4) & 0xF;
+}
 
-void propagateLightBFS() { // seed the lighting queue beforehand (note to self to reset the lighting queue first)
+static inline uint8_t getBlockLight(uint8_t b)
+{
+    return b & 0xF;
+}
+
+static inline void setSkylight(uint8_t *b, uint8_t s)
+{
+    *b = (*b & 0x0F) | ((s & 0xF) << 4);
+}
+
+static inline void setBlockLight(uint8_t *b, uint8_t s)
+{
+    *b = (*b & 0xF0) | (s & 0xF);
+}
+
+void propagateLightBFS(int isBlockLight) { // seed the lighting queue beforehand (note to self to reset the lighting queue first)
     Vec3 neighborShift[] = {
         {-1, 0, 0},
         {1, 0, 0},
@@ -1259,6 +1284,17 @@ void propagateLightBFS() { // seed the lighting queue beforehand (note to self t
         {0, 0, -1}
     };
 
+    uint8_t (*getLight)(uint8_t);
+    void (*setLight)(uint8_t *, uint8_t);
+
+    if (isBlockLight) {
+        getLight = getBlockLight;
+        setLight = setBlockLight;
+    } else {
+        getLight = getSkylight;
+        setLight = setSkylight;
+    }
+
     int nodesProcessed = 0;
     while (lightingQueue.size > 0) { 
         nodesProcessed++;
@@ -1266,10 +1302,18 @@ void propagateLightBFS() { // seed the lighting queue beforehand (note to self t
         if (queueEntry == NULL) { continue; } 
         
         Chunk *curLightingChunk = chunkAtPosition(queueEntry->x, queueEntry->y, queueEntry->z);
+        if (curLightingChunk == NULL) {continue;}
+
         curLightingChunk->lightDirty = 1;
-        int blockIndex = ((int)queueEntry->x - curLightingChunk->chunkStartX) + ((int)queueEntry->z - curLightingChunk->chunkStartZ) * ChunkWidthX + (int)queueEntry->y * ChunkWidthX * ChunkLengthZ; 
-        
-        if (GET_BLOCK_LIGHT(curLightingChunk->lightData[blockIndex]) == 0) { continue; } 
+        int blockIndex = ((int)queueEntry->x - (int)curLightingChunk->chunkStartX) + ((int)queueEntry->z - (int)curLightingChunk->chunkStartZ) * ChunkWidthX + (int)queueEntry->y * ChunkWidthX * ChunkLengthZ; 
+        if (blockIndex < 0 ||
+            blockIndex >= ChunkWidthX * ChunkLengthZ * ChunkHeightY)
+        {
+            printf("BAD INDEX %d at %d %d %d\n", blockIndex, queueEntry->x, queueEntry->y, queueEntry->z);
+            continue;
+        }
+
+        if (getLight(curLightingChunk->lightData[blockIndex]) == 0) { continue; } 
         
         int neighborIndex; 
         int traversingWorldX = queueEntry->x;
@@ -1286,17 +1330,25 @@ void propagateLightBFS() { // seed the lighting queue beforehand (note to self t
             }
 
             Chunk *neighborLightingChunk = chunkAtPosition(nx, ny, nz);
-            neighborIndex = (nx - neighborLightingChunk->chunkStartX) + (nz - neighborLightingChunk->chunkStartZ) * ChunkWidthX + ny * ChunkWidthX * ChunkLengthZ; 
+            if (neighborLightingChunk == NULL) {continue;}
+
+            neighborIndex = (nx - (int)neighborLightingChunk->chunkStartX) + (nz - (int)neighborLightingChunk->chunkStartZ) * ChunkWidthX + ny * ChunkWidthX * ChunkLengthZ; 
         
-            
+            if (neighborIndex < 0 ||
+                neighborIndex >= ChunkWidthX * ChunkLengthZ * ChunkHeightY)
+            {
+                printf("BAD INDEX %d\n", neighborIndex);
+                exit(1);
+            }
+
             if (
-                (GET_BLOCK_LIGHT(neighborLightingChunk->lightData[neighborIndex]) >= (GET_BLOCK_LIGHT(curLightingChunk->lightData[blockIndex])-1)) || 
+                (getLight(neighborLightingChunk->lightData[neighborIndex]) >= (getLight(curLightingChunk->lightData[blockIndex])-1)) || 
                 (!neighborLightingChunk->blocks[neighborIndex].isAir && blockRegistry[neighborLightingChunk->blocks[neighborIndex].blockType].isRenderSolid) 
             ) { continue; }
             neighborLightingChunk->lightDirty = 1;
 
-            SET_BLOCK_LIGHT(neighborLightingChunk->lightData[neighborIndex], GET_BLOCK_LIGHT(curLightingChunk->lightData[blockIndex])-1); 
-            enqueue(&lightingQueue, neighborLightingChunk->blocks[neighborIndex].x, neighborLightingChunk->blocks[neighborIndex].y, neighborLightingChunk->blocks[neighborIndex].z); 
+            setLight(&neighborLightingChunk->lightData[neighborIndex], getLight(curLightingChunk->lightData[blockIndex])-1); 
+            enqueue(&lightingQueue, (int)neighborLightingChunk->blocks[neighborIndex].x, (int)neighborLightingChunk->blocks[neighborIndex].y, (int)neighborLightingChunk->blocks[neighborIndex].z); 
         }
     }
 }
@@ -1306,7 +1358,9 @@ void computeSkylightForChunk(Chunk *chunk) {
     // this is the light baking step
 
     resetLightingQueue(&lightingQueue);
-    
+    // int skylightEmissiveBlocks[32768];
+    // int amtSkylightEmissiveBlocks = 0;
+
     for (int x = 0; x < ChunkWidthX; x++) {
         for (int z = 0; z < ChunkLengthZ; z++) {
             uint8_t currentLight = 5;
@@ -1318,32 +1372,40 @@ void computeSkylightForChunk(Chunk *chunk) {
                 
                 if (blockRegistry[curBlock->blockType].lightEmissivePower && !curBlock->isAir) {
                     if (!chunk->isInitialLightCreated) { SET_BLOCK_LIGHT(chunk->lightData[index], (uint8_t)(blockRegistry[curBlock->blockType].lightEmissivePower)); }
-                    SET_SKYLIGHT(chunk->lightData[index], (uint8_t)(0));
-                    
                     enqueue(&lightingQueue, 
                         (int)(curBlock->x),
                         (int)(curBlock->y),
                         (int)(curBlock->z)
                     );
                 } else {
-                    SET_SKYLIGHT(chunk->lightData[index], (uint8_t)(currentLight));
                     if (!chunk->isInitialLightCreated) { SET_BLOCK_LIGHT(chunk->lightData[index], (uint8_t)(0)); }
                 }
 
+                SET_SKYLIGHT(chunk->lightData[index], (uint8_t)(currentLight));
 
+                if (!curBlock->isAir && blockRegistry[curBlock->blockType].isRenderSolid && currentLight) {
+                    currentLight = 0;
+                    // int skylightSeed = index + ChunkWidthX * ChunkLengthZ;
 
-                if (!curBlock->isAir && blockRegistry[curBlock->blockType].lightEmissivePower == 0) {
-                    currentLight = (uint8_t)(max(0, currentLight - 3));
-                } 
-                
-                 
+                    // if (skylightSeed < ChunkWidthX * ChunkLengthZ * ChunkHeightY)
+                    // {
+                    //     skylightEmissiveBlocks[amtSkylightEmissiveBlocks++] = skylightSeed;
+                    // }
+                }               
             }
         }
     } 
 
     chunk->lightDirty = 1;
 
-    propagateLightBFS();
-
+    propagateLightBFS(1);
+    // resetLightingQueue(&lightingQueue);
+    // for (int i = 0; i < amtSkylightEmissiveBlocks; i++) {
+    //     enqueue(&lightingQueue, (int)chunk->blocks[skylightEmissiveBlocks[i]].x, (int)chunk->blocks[skylightEmissiveBlocks[i]].y, (int)chunk->blocks[skylightEmissiveBlocks[i]].z);
+    // }
+    // printf("start\n");
+    // propagateLightBFS(0); 
+    // printf("end\n");
+    
     chunk->isInitialLightCreated = 1;
 } 
