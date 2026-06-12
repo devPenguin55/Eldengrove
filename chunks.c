@@ -15,14 +15,11 @@ ChunkMeshQuads chunkMeshQuads;
 BlockType blockRegistry[100];
 Queue lightingQueue;
 
-
 float BlockWidthX = 1;
 float BlockHeightY = 1;
 float BlockLengthZ = 1;
 
 int DEBUG_MODE = 0;
-
-
 
 void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, int flag, uint64_t key)
 {
@@ -50,7 +47,7 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
 
     chunk->gpuLightIndex = -1;
 
-    chunk->lightData = calloc(1, sizeof(uint8_t)*ChunkWidthX*ChunkLengthZ*ChunkHeightY);
+    chunk->lightData = calloc(1, sizeof(uint8_t) * ChunkWidthX * ChunkLengthZ * ChunkHeightY);
     chunk->isInitialLightCreated = 0;
 
     for (int x = 0; x < ChunkWidthX; x++)
@@ -153,7 +150,7 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
                     curBlock->blockType = BLOCK_TYPE_WATER;
                 }
 
-                // ! REMOVE 
+                // ! REMOVE
                 // curBlock->blockType = BLOCK_TYPE_DIRT;
                 // curBlock->isAir = y > 50;
                 // curBlock->isAir = (int)(y/2) > (int)(0.5*(40+x/2+z/2));
@@ -392,8 +389,9 @@ static inline int checkIfFaceValidToBeInMesh(Block *mainBlock, Block *neighborBl
 
 void generateChunkMesh(Chunk *chunk)
 {
-    if (!chunk->isInitialLightCreated) {
-        computeSkylightForChunk(chunk);
+    if (!chunk->isInitialLightCreated)
+    {
+        computeInitialLightingForChunk(chunk);
     }
 
     // printf("starting mesh amts %d\n", chunkMeshQuads.amtQuads);
@@ -1221,18 +1219,21 @@ void deleteChunkMesh(Chunk *chunk)
     // printf("New starting quad index is at %d\n", chunkMeshQuads.amtQuads);
 }
 
-void resetLightingQueue(Queue *queue) {
+void resetLightingQueue(Queue *queue)
+{
     queue->front = 0;
     queue->rear = 0;
     queue->capacity = 100000;
     queue->size = 0;
 }
 
-void enqueue(Queue *queue, int worldX, int worldY, int worldZ) {
-    if (queue->size >= queue->capacity) {
+void enqueue(Queue *queue, int worldX, int worldY, int worldZ)
+{
+    if (queue->size >= queue->capacity)
+    {
         printf("LIGHT QUEUE FULL!\n");
         exit(1);
-        return; 
+        return;
     }
 
     // appends to the end of the queue
@@ -1243,9 +1244,11 @@ void enqueue(Queue *queue, int worldX, int worldY, int worldZ) {
     queue->size++;
 }
 
-QueueEntry *dequeue(Queue *queue) {
-    if (queue->size == 0) {
-        return NULL; 
+QueueEntry *dequeue(Queue *queue)
+{
+    if (queue->size == 0)
+    {
+        return NULL;
     }
 
     // pops from the start of queue and returns it
@@ -1275,38 +1278,48 @@ static inline void setBlockLight(uint8_t *b, uint8_t s)
     *b = (*b & 0xF0) | (s & 0xF);
 }
 
-void propagateLightBFS(int isBlockLight) { // seed the lighting queue beforehand (note to self to reset the lighting queue first)
+void propagateLightBFS(int isBlockLight)
+{ // seed the lighting queue beforehand (note to self to reset the lighting queue first)
     Vec3 neighborShift[] = {
         {-1, 0, 0},
         {1, 0, 0},
         {0, -1, 0},
         {0, 1, 0},
         {0, 0, 1},
-        {0, 0, -1}
-    };
+        {0, 0, -1}};
 
     uint8_t (*getLight)(uint8_t);
     void (*setLight)(uint8_t *, uint8_t);
 
-    if (isBlockLight) {
+    if (isBlockLight)
+    {
         getLight = getBlockLight;
         setLight = setBlockLight;
-    } else {
+    }
+    else
+    {
         getLight = getSkylight;
         setLight = setSkylight;
     }
 
     int nodesProcessed = 0;
-    while (lightingQueue.size > 0) { 
+    while (lightingQueue.size > 0)
+    {
         nodesProcessed++;
-        QueueEntry *queueEntry = dequeue(&lightingQueue); 
-        if (queueEntry == NULL) { continue; } 
-        
+        QueueEntry *queueEntry = dequeue(&lightingQueue);
+        if (queueEntry == NULL)
+        {
+            continue;
+        }
+
         Chunk *curLightingChunk = chunkAtPosition(queueEntry->x, queueEntry->y, queueEntry->z);
-        if (curLightingChunk == NULL) {continue;}
+        if (curLightingChunk == NULL)
+        {
+            continue;
+        }
 
         curLightingChunk->lightDirty = 1;
-        int blockIndex = ((int)queueEntry->x - (int)curLightingChunk->chunkStartX) + ((int)queueEntry->z - (int)curLightingChunk->chunkStartZ) * ChunkWidthX + (int)queueEntry->y * ChunkWidthX * ChunkLengthZ; 
+        int blockIndex = ((int)queueEntry->x - (int)curLightingChunk->chunkStartX) + ((int)queueEntry->z - (int)curLightingChunk->chunkStartZ) * ChunkWidthX + (int)queueEntry->y * ChunkWidthX * ChunkLengthZ;
         if (blockIndex < 0 ||
             blockIndex >= ChunkWidthX * ChunkLengthZ * ChunkHeightY)
         {
@@ -1314,27 +1327,35 @@ void propagateLightBFS(int isBlockLight) { // seed the lighting queue beforehand
             continue;
         }
 
-        if (getLight(curLightingChunk->lightData[blockIndex]) == 0) { continue; } 
-        
-        int neighborIndex; 
+        if (getLight(curLightingChunk->lightData[blockIndex]) == 0)
+        {
+            continue;
+        }
+
+        int neighborIndex;
         int traversingWorldX = queueEntry->x;
         int traversingWorldY = queueEntry->y;
         int traversingWorldZ = queueEntry->z;
 
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < 6; i++)
+        {
             int nx = traversingWorldX + (int)neighborShift[i].x;
             int ny = traversingWorldY + (int)neighborShift[i].y;
             int nz = traversingWorldZ + (int)neighborShift[i].z;
 
-            if (ny < 0 || ny >= ChunkHeightY) {
+            if (ny < 0 || ny >= ChunkHeightY)
+            {
                 continue;
             }
 
             Chunk *neighborLightingChunk = chunkAtPosition(nx, ny, nz);
-            if (neighborLightingChunk == NULL) {continue;}
+            if (neighborLightingChunk == NULL)
+            {
+                continue;
+            }
 
-            neighborIndex = (nx - (int)neighborLightingChunk->chunkStartX) + (nz - (int)neighborLightingChunk->chunkStartZ) * ChunkWidthX + ny * ChunkWidthX * ChunkLengthZ; 
-        
+            neighborIndex = (nx - (int)neighborLightingChunk->chunkStartX) + (nz - (int)neighborLightingChunk->chunkStartZ) * ChunkWidthX + ny * ChunkWidthX * ChunkLengthZ;
+
             if (neighborIndex < 0 ||
                 neighborIndex >= ChunkWidthX * ChunkLengthZ * ChunkHeightY)
             {
@@ -1343,48 +1364,55 @@ void propagateLightBFS(int isBlockLight) { // seed the lighting queue beforehand
             }
 
             if (
-                (getLight(neighborLightingChunk->lightData[neighborIndex]) >= (getLight(curLightingChunk->lightData[blockIndex])-1)) || 
-                (!neighborLightingChunk->blocks[neighborIndex].isAir && blockRegistry[neighborLightingChunk->blocks[neighborIndex].blockType].isRenderSolid) 
-            ) { continue; }
+                (getLight(neighborLightingChunk->lightData[neighborIndex]) >= (getLight(curLightingChunk->lightData[blockIndex]) - 1)) ||
+                (!neighborLightingChunk->blocks[neighborIndex].isAir && blockRegistry[neighborLightingChunk->blocks[neighborIndex].blockType].isRenderSolid))
+            {
+                continue;
+            }
             neighborLightingChunk->lightDirty = 1;
 
-            setLight(&neighborLightingChunk->lightData[neighborIndex], getLight(curLightingChunk->lightData[blockIndex])-1); 
-            enqueue(&lightingQueue, (int)neighborLightingChunk->blocks[neighborIndex].x, (int)neighborLightingChunk->blocks[neighborIndex].y, (int)neighborLightingChunk->blocks[neighborIndex].z); 
+            setLight(&neighborLightingChunk->lightData[neighborIndex], getLight(curLightingChunk->lightData[blockIndex]) - 1);
+            enqueue(&lightingQueue, (int)neighborLightingChunk->blocks[neighborIndex].x, (int)neighborLightingChunk->blocks[neighborIndex].y, (int)neighborLightingChunk->blocks[neighborIndex].z);
         }
     }
 }
 
-void computeSkylightForChunk(Chunk *chunk) {
+void computeInitialLightingForChunk(Chunk *chunk)
+{
     // should only be called after chunk + neighbor chunks loaded
     // this is the light baking step
 
     resetLightingQueue(&lightingQueue);
-    // int skylightEmissiveBlocks[32768];
-    // int amtSkylightEmissiveBlocks = 0;
+    int skylightEmissiveBlocks[32768];
+    int amtSkylightEmissiveBlocks = 0;
 
-    for (int x = 0; x < ChunkWidthX; x++) {
-        for (int z = 0; z < ChunkLengthZ; z++) {
+    for (int x = 0; x < ChunkWidthX; x++)
+    {
+        for (int z = 0; z < ChunkLengthZ; z++)
+        {
             uint8_t currentLight = 5;
-            for (int y = ChunkHeightY - 1; y >= 0; y--) {
+            for (int y = ChunkHeightY - 1; y >= 0; y--)
+            {
                 int index = x + z * (ChunkWidthX) + y * (ChunkWidthX * ChunkLengthZ);
                 Block *curBlock = &chunk->blocks[index];
 
                 uint8_t originalLight = chunk->lightData[index];
-                      
+
                 SET_SKYLIGHT(chunk->lightData[index], (uint8_t)(currentLight));
 
-                if (!curBlock->isAir && blockRegistry[curBlock->blockType].isRenderSolid && currentLight) {
+                if (!curBlock->isAir && blockRegistry[curBlock->blockType].isRenderSolid && currentLight)
+                {
                     currentLight = 0;
-                    // int skylightSeed = index + ChunkWidthX * ChunkLengthZ;
+                    int skylightSeed = index + ChunkWidthX * ChunkLengthZ;
 
-                    // if (skylightSeed < ChunkWidthX * ChunkLengthZ * ChunkHeightY)
-                    // {
-                    //     skylightEmissiveBlocks[amtSkylightEmissiveBlocks++] = skylightSeed;
-                    // }
-                }               
+                    if (skylightSeed < ChunkWidthX * ChunkLengthZ * ChunkHeightY)
+                    {
+                        skylightEmissiveBlocks[amtSkylightEmissiveBlocks++] = skylightSeed;
+                    }
+                }
             }
         }
-    } 
+    }
 
     chunk->lightDirty = 1;
 
@@ -1422,14 +1450,14 @@ void computeSkylightForChunk(Chunk *chunk) {
     }
 
     propagateLightBFS(1);
-    
-    // resetLightingQueue(&lightingQueue);
-    // for (int i = 0; i < amtSkylightEmissiveBlocks; i++) {
-    //     enqueue(&lightingQueue, (int)chunk->blocks[skylightEmissiveBlocks[i]].x, (int)chunk->blocks[skylightEmissiveBlocks[i]].y, (int)chunk->blocks[skylightEmissiveBlocks[i]].z);
-    // }
-    // printf("start\n");
-    // propagateLightBFS(0); 
-    // printf("end\n");
-    
+
+    resetLightingQueue(&lightingQueue);
+    for (int i = 0; i < amtSkylightEmissiveBlocks; i++) {
+        enqueue(&lightingQueue, (int)chunk->blocks[skylightEmissiveBlocks[i]].x, (int)chunk->blocks[skylightEmissiveBlocks[i]].y, (int)chunk->blocks[skylightEmissiveBlocks[i]].z);
+    }
+    printf("start\n");
+    propagateLightBFS(0);
+    printf("end\n");
+
     chunk->isInitialLightCreated = 1;
-} 
+}
