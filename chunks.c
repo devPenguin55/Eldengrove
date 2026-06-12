@@ -9,6 +9,7 @@
 #include "noise.h"
 #include "player.h"
 #include "worldDiskStorage.h"
+#include "input.h"
 
 ChunkMeshQuads chunkMeshQuads;
 BlockType blockRegistry[100];
@@ -332,8 +333,6 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
             }
         }
     }
-
-    // computeSkylightForChunk(chunk);
 }
 
 void initChunkMeshingSystem()
@@ -393,7 +392,9 @@ static inline int checkIfFaceValidToBeInMesh(Block *mainBlock, Block *neighborBl
 
 void generateChunkMesh(Chunk *chunk)
 {
-    computeSkylightForChunk(chunk);
+    if (!chunk->isInitialLightCreated) {
+        computeSkylightForChunk(chunk);
+    }
 
     // printf("starting mesh amts %d\n", chunkMeshQuads.amtQuads);
     int tops[ChunkWidthX][ChunkLengthZ][ChunkHeightY] = {0};    // * X-Z plane, y fixed
@@ -1369,18 +1370,7 @@ void computeSkylightForChunk(Chunk *chunk) {
                 Block *curBlock = &chunk->blocks[index];
 
                 uint8_t originalLight = chunk->lightData[index];
-                
-                if (blockRegistry[curBlock->blockType].lightEmissivePower && !curBlock->isAir) {
-                    if (!chunk->isInitialLightCreated) { SET_BLOCK_LIGHT(chunk->lightData[index], (uint8_t)(blockRegistry[curBlock->blockType].lightEmissivePower)); }
-                    enqueue(&lightingQueue, 
-                        (int)(curBlock->x),
-                        (int)(curBlock->y),
-                        (int)(curBlock->z)
-                    );
-                } else {
-                    if (!chunk->isInitialLightCreated) { SET_BLOCK_LIGHT(chunk->lightData[index], (uint8_t)(0)); }
-                }
-
+                      
                 SET_SKYLIGHT(chunk->lightData[index], (uint8_t)(currentLight));
 
                 if (!curBlock->isAir && blockRegistry[curBlock->blockType].isRenderSolid && currentLight) {
@@ -1398,7 +1388,41 @@ void computeSkylightForChunk(Chunk *chunk) {
 
     chunk->lightDirty = 1;
 
+    int chunkXUnit = ChunkWidthX * BlockWidthX;
+    int chunkZUnit = ChunkLengthZ * BlockLengthZ;
+
+    resetLightingQueue(&lightingQueue);
+    for (int dx = -1; dx <= 1; dx++)
+    {
+        for (int dz = -1; dz <= 1; dz++)
+        {
+            uint64_t chunkKey = packChunkKey(
+                (int)((chunk->chunkStartX + dx * chunkXUnit) / (chunkXUnit)),
+                (int)((chunk->chunkStartZ + dz * chunkZUnit) / (chunkZUnit)));
+
+            BucketEntry *result = getHashmapEntry(chunkKey);
+
+            if (result != NULL)
+            {
+                result->chunkEntry->lightDirty = 1;
+                for (int i = 0; i < 32768; i++)
+                {
+                    if (blockRegistry[result->chunkEntry->blocks[i].blockType].lightEmissivePower && !result->chunkEntry->blocks[i].isAir)
+                    {
+                        enqueue(&lightingQueue, result->chunkEntry->blocks[i].x, result->chunkEntry->blocks[i].y, result->chunkEntry->blocks[i].z);
+                        SET_BLOCK_LIGHT(result->chunkEntry->lightData[i], blockRegistry[result->chunkEntry->blocks[i].blockType].lightEmissivePower);
+                    }
+                    else if (dx == dz && dx == 0)
+                    {
+                        SET_BLOCK_LIGHT(result->chunkEntry->lightData[i], 0);
+                    }
+                }
+            }
+        }
+    }
+
     propagateLightBFS(1);
+    
     // resetLightingQueue(&lightingQueue);
     // for (int i = 0; i < amtSkylightEmissiveBlocks; i++) {
     //     enqueue(&lightingQueue, (int)chunk->blocks[skylightEmissiveBlocks[i]].x, (int)chunk->blocks[skylightEmissiveBlocks[i]].y, (int)chunk->blocks[skylightEmissiveBlocks[i]].z);

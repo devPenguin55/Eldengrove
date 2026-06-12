@@ -13,6 +13,7 @@
 #include "chunkLoaderManager.h"
 #include "raycast.h"
 #include "player.h"
+#include "worldDiskStorage.h"
 
 GLfloat T = 0;
 
@@ -462,7 +463,21 @@ void createWorldLightingDataFromAllChunks()
         Chunk *chunk = renderChunks->renderChunks[i];
     
         if (!chunk->lightDirty) { continue; }
-        // printf("%f %f\n", chunk->chunkStartX, chunk->chunkStartZ);
+        ChunksToSaveToDisk *chunksToSaveToDisk = &(chunkLoaderManager.chunksToSaveToDisk);
+
+        for (int j = 0; j < chunksToSaveToDisk->amtChunksToSaveToDisk; j++)
+        {
+            if (chunksToSaveToDisk->chunksToSaveToDisk[j]->key == chunk->key)
+            {
+                chunksToSaveToDisk->chunksToSaveToDisk[j] = chunksToSaveToDisk->chunksToSaveToDisk[chunksToSaveToDisk->amtChunksToSaveToDisk - 1];
+                chunksToSaveToDisk->amtChunksToSaveToDisk--;
+                break;
+            }
+        }
+ 
+        saveChunkToDisk(chunk);
+
+        
         chunk->lightDirty = 0;
 
         int chunkBase = chunk->gpuLightIndex * chunkVoxelCount;
@@ -2029,6 +2044,6 @@ void drawGraphics()
             triggerRenderChunkRebuild(result->chunkEntry);
         }
 
-        blockPlacingOrBreakingLightingRecalculation();
+        blockPlacingOrBreakingLightingRecalculation(selectedBlockToRender.chunk);
     }
 }

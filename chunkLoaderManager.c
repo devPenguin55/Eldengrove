@@ -260,6 +260,7 @@ void loadChunks(GLfloat playerCoords[2])
             if (curChunk == loadedChunks->loadedChunks[loadedChunkIdx])
             {
                 // this is a match of pointers to a chunk
+                curChunk->isDirty = 1;
                 saveChunkToDisk(curChunk);
                 deleteHashmapEntry(curChunk->key);
                 loadedChunks->loadedChunks[loadedChunkIdx] = loadedChunks->loadedChunks[loadedChunks->amtLoadedChunks - 1];

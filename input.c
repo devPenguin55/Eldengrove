@@ -84,7 +84,7 @@ void handleKeyUp(unsigned char key, int x, int y)
     pressedKeys[key] = 0;
 }
 
-void blockPlacingOrBreakingLightingRecalculation()
+void blockPlacingOrBreakingLightingRecalculation(Chunk *chunk)
 {
     int chunkXUnit = ChunkWidthX * BlockWidthX;
     int chunkZUnit = ChunkLengthZ * BlockLengthZ;
@@ -95,8 +95,8 @@ void blockPlacingOrBreakingLightingRecalculation()
         for (int dz = -1; dz <= 1; dz++)
         {
             uint64_t chunkKey = packChunkKey(
-                (int)((selectedBlockToRender.chunk->chunkStartX + dx * chunkXUnit) / (chunkXUnit)),
-                (int)((selectedBlockToRender.chunk->chunkStartZ + dz * chunkZUnit) / (chunkZUnit)));
+                (int)((chunk->chunkStartX + dx * chunkXUnit) / (chunkXUnit)),
+                (int)((chunk->chunkStartZ + dz * chunkZUnit) / (chunkZUnit)));
 
             BucketEntry *result = getHashmapEntry(chunkKey);
 
@@ -105,7 +105,6 @@ void blockPlacingOrBreakingLightingRecalculation()
                 result->chunkEntry->lightDirty = 1;
                 for (int i = 0; i < 32768; i++)
                 {
-                    
                     if (blockRegistry[result->chunkEntry->blocks[i].blockType].lightEmissivePower && !result->chunkEntry->blocks[i].isAir)
                     {
                         enqueue(&lightingQueue, result->chunkEntry->blocks[i].x, result->chunkEntry->blocks[i].y, result->chunkEntry->blocks[i].z);
@@ -342,7 +341,7 @@ void handleMouse(int button, int state, int x_, int y_)
 
             triggerRenderChunkRebuild(selectedBlockToRender.chunk);
 
-            blockPlacingOrBreakingLightingRecalculation();
+            blockPlacingOrBreakingLightingRecalculation(selectedBlockToRender.chunk);
         }
     }
     else
