@@ -83,7 +83,6 @@ void handleKeyUp(unsigned char key, int x, int y)
 {
     pressedKeys[key] = 0;
 }
-
 void blockPlacingOrBreakingLightingRecalculation(Chunk *chunk)
 {
     int chunkXUnit = ChunkWidthX * BlockWidthX;
@@ -120,96 +119,7 @@ void blockPlacingOrBreakingLightingRecalculation(Chunk *chunk)
     }
 
     propagateLightBFS(1);
-
-    resetLightingQueue(&lightingQueue);
-    for (int dx = -1; dx <= 1; dx++)
-    {
-        for (int dz = -1; dz <= 1; dz++)
-        {
-            uint64_t chunkKey = packChunkKey(
-                (int)((chunk->chunkStartX + dx * chunkXUnit) / chunkXUnit),
-                (int)((chunk->chunkStartZ + dz * chunkZUnit) / chunkZUnit));
-
-            BucketEntry *result = getHashmapEntry(chunkKey);
-            if (result == NULL) continue;
-
-            Chunk *neighbor = result->chunkEntry;
-            int isCenter = (dx == 0 && dz == 0);
-
-            // top-down skylight pass for every chunk in 3x3
-            for (int x = 0; x < ChunkWidthX; x++)
-            {
-                for (int z = 0; z < ChunkLengthZ; z++)
-                {
-                    uint8_t currentLight = 15;
-                    for (int y = ChunkHeightY - 1; y >= 0; y--)
-                    {
-                        int index = x + z * ChunkWidthX + y * ChunkWidthX * ChunkLengthZ;
-                        Block *curBlock = &neighbor->blocks[index];
-
-                        if (currentLight > 0)
-                            SET_SKYLIGHT(neighbor->lightData[index], currentLight);
-                        else
-                            SET_SKYLIGHT(neighbor->lightData[index], 0);
-
-                        if (!curBlock->isAir && blockRegistry[curBlock->blockType].isRenderSolid && currentLight)
-                        {
-                            currentLight = 0;
-                            int skylightSeed = index + ChunkWidthX * ChunkLengthZ;
-                            if (skylightSeed < ChunkWidthX * ChunkLengthZ * ChunkHeightY && neighbor->blocks[skylightSeed].isAir)
-                            {
-                                enqueue(&lightingQueue,
-                                    (int)neighbor->blocks[skylightSeed].x,
-                                    (int)neighbor->blocks[skylightSeed].y,
-                                    (int)neighbor->blocks[skylightSeed].z);
-                            }
-                        } else if (!curBlock->isAir && curBlock->blockType == BLOCK_TYPE_WATER && currentLight) {
-                            int skylightSeed = index + ChunkWidthX * ChunkLengthZ;
-                            if (skylightSeed < ChunkWidthX * ChunkLengthZ * ChunkHeightY && neighbor->blocks[skylightSeed].isAir)
-                            {
-                                SET_SKYLIGHT(neighbor->lightData[index], currentLight);
-                                enqueue(&lightingQueue,
-                                    (int)neighbor->blocks[skylightSeed].x,
-                                    (int)neighbor->blocks[skylightSeed].y,
-                                    (int)neighbor->blocks[skylightSeed].z);
-                            }
-                            currentLight = (currentLight > 2) ? (currentLight - 2) : 0;
-                        }
-                    }
-                }
-            }
-            neighbor->lightDirty = 1;
-
-            if (isCenter) continue; // center seeded via surface seeds above, skip border seeding
-
-            // border face seeding for non-center non-diagonal neighbors
-            for (int y = 0; y < ChunkHeightY; y++)
-            {
-                for (int s = 0; s < 16; s++)
-                {
-                    int nx, nz;
-                    if (dx == -1 && dz == 0)      { nx = ChunkWidthX - 1; nz = s; }
-                    else if (dx == 1 && dz == 0)  { nx = 0;               nz = s; }
-                    else if (dx == 0 && dz == -1) { nx = s; nz = ChunkLengthZ - 1; }
-                    else if (dx == 0 && dz == 1)  { nx = s; nz = 0; }
-                    else continue; // skip diagonals
-
-                    int index = nx + nz * ChunkWidthX + y * ChunkWidthX * ChunkLengthZ;
-                    if (neighbor->blocks[index].isAir && GET_SKYLIGHT(neighbor->lightData[index]) > 0)
-                    {
-                        enqueue(&lightingQueue,
-                            (int)neighbor->blocks[index].x,
-                            (int)neighbor->blocks[index].y,
-                            (int)neighbor->blocks[index].z);
-                    }
-                }
-            }
-        }
-    }
-
-    propagateLightBFS(0);
 }
-
 void handleMouse(int button, int state, int x_, int y_)
 {
     // button: GLUT_LEFT_BUTTON, GLUT_RIGHT_BUTTON, etc.

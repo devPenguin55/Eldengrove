@@ -234,6 +234,7 @@ void loadChunks(GLfloat playerCoords[2])
                 // printf("deleting a chunk mesh!\n");
                 // printf("chunk coordinates are at %d %d\n", loadedChunkX, loadedChunkZ);
                 deleteChunkMesh(curChunk);
+                saveChunkToDisk(curChunk);
                 curChunk->triggerVertexDeletion = 1;
             }
         }
@@ -260,7 +261,6 @@ void loadChunks(GLfloat playerCoords[2])
             if (curChunk == loadedChunks->loadedChunks[loadedChunkIdx])
             {
                 // this is a match of pointers to a chunk
-                curChunk->isDirty = 1;
                 saveChunkToDisk(curChunk);
                 deleteHashmapEntry(curChunk->key);
                 loadedChunks->loadedChunks[loadedChunkIdx] = loadedChunks->loadedChunks[loadedChunks->amtLoadedChunks - 1];
@@ -294,7 +294,6 @@ void loadChunks(GLfloat playerCoords[2])
                 // * the chunk has not been loaded yet, must load it in and add to the hashmap
                 // ? chunks that are loaded are just skipped since their data is already there
                 writeHashmapEntry(chunkKey, chunkX, chunkZ, 1);
-                // if (chunkX == -1 && chunkZ == 0) {printf("Done loading chunks!\n");}
                 result = getHashmapEntry(chunkKey);
 
                 if (loadedChunks->amtLoadedChunks >= loadedChunks->capacity)
@@ -305,6 +304,7 @@ void loadChunks(GLfloat playerCoords[2])
 
                 loadedChunks->loadedChunks[(loadedChunks->amtLoadedChunks)++] = result->chunkEntry;
                 fetchChunkFromDisk(chunkX, chunkZ, result->chunkEntry);
+                
                 if (initialAmtLoadedChunksUntilMeshing < (2 * CHUNK_PRELOAD_RADIUS + 1) * (2 * CHUNK_PRELOAD_RADIUS + 1))
                 {
                     initialAmtLoadedChunksUntilMeshing++;
@@ -346,6 +346,10 @@ void loadChunks(GLfloat playerCoords[2])
                     renderChunks->renderChunks = realloc(renderChunks->renderChunks, renderChunks->capacity * sizeof(Chunk *));
                 }
                 renderChunks->renderChunks[(renderChunks->amtRenderChunks)++] = result->chunkEntry;
+
+                if (!result->chunkEntry->isInitialLightCreated) {  
+                    computeInitialLightingForChunk(result->chunkEntry);  
+                }
             }
         }
     }
@@ -354,11 +358,14 @@ void loadChunks(GLfloat playerCoords[2])
     {
         Chunk *curChunkToRender = renderChunks->renderChunks[renderChunkIdx];
         if (curChunkToRender->flag == CHUNK_FLAG_RENDERED_AND_LOADED)
-        {
+        { 
             continue;
         }
-        curChunkToRender->hasMesh = 1;
+
+        fetchChunkFromDisk((int)curChunkToRender->chunkStartX, (int)curChunkToRender->chunkStartZ, curChunkToRender);
+        curChunkToRender->hasMesh = 1; 
         generateChunkMesh(curChunkToRender);
+        renderChunkLoadInForNeighbors(curChunkToRender);
     }
 
     
