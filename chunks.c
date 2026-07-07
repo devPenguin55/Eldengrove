@@ -1386,6 +1386,7 @@ void renderChunkLoadInForNeighbors(Chunk *chunk)
             if (dx == 0 && dz == 0) {
                 continue;
             }
+            
             uint64_t chunkKey = packChunkKey(
                 (int)((chunk->chunkStartX + dx * chunkXUnit) / (chunkXUnit)),
                 (int)((chunk->chunkStartZ + dz * chunkZUnit) / (chunkZUnit)));
@@ -1394,22 +1395,29 @@ void renderChunkLoadInForNeighbors(Chunk *chunk)
 
             if (result != NULL)
             {
+                
                 result->chunkEntry->lightDirty = 1;
                 for (int i = 0; i < 32768; i++)
                 {
                     if (blockRegistry[result->chunkEntry->blocks[i].blockType].lightEmissivePower && !result->chunkEntry->blocks[i].isAir)
                     {
                         enqueue(&lightingQueue, result->chunkEntry->blocks[i].x, result->chunkEntry->blocks[i].y, result->chunkEntry->blocks[i].z);
-                        SET_BLOCK_LIGHT(result->chunkEntry->lightData[i], blockRegistry[result->chunkEntry->blocks[i].blockType].lightEmissivePower);
+                        if (!result->chunkEntry->isInitialLightCreated) {
+                            SET_BLOCK_LIGHT(result->chunkEntry->lightData[i], blockRegistry[result->chunkEntry->blocks[i].blockType].lightEmissivePower);
+                        }
                     }
                     else
                     {
-                        SET_BLOCK_LIGHT(result->chunkEntry->lightData[i], 0);
+                        if (!result->chunkEntry->isInitialLightCreated) {
+                            SET_BLOCK_LIGHT(result->chunkEntry->lightData[i], 0);
+                        }
                     }
-                }
+                } 
             }
         }
     }
+
+    chunk->isInitialLightCreated = 1;
 
     propagateLightBFS(1);
 }
