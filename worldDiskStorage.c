@@ -111,6 +111,6 @@ void fetchChunkFromDisk(int chunkX, int chunkZ, Chunk *writeChunk) {
     fread(writeChunk->blocks, sizeof(Block), voxelCount, file);
     fread(writeChunk->lightData, sizeof(uint8_t), voxelCount, file);
 
-    writeChunk->isInitialLightCreated = 1;
+    writeChunk->isInitialLightCreated = 0;
     fclose(file); 
 }
