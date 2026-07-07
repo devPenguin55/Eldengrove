@@ -1274,7 +1274,7 @@ static inline void setBlockLight(uint8_t *b, uint8_t s)
     *b = (*b & 0xF0) | (s & 0xF);
 }
 
-void propagateLightBFS(int isBlockLight)
+void propagateLightBFS(Queue *targetQueue, int isBlockLight)
 { // seed the lighting queue beforehand (note to self to reset the lighting queue first)
     Vec3 neighborShift[] = {
         {-1, 0, 0},
@@ -1299,10 +1299,10 @@ void propagateLightBFS(int isBlockLight)
     }
 
     int nodesProcessed = 0;
-    while (lightingQueue.size > 0)
+    while (targetQueue->size > 0)
     {
         nodesProcessed++;
-        QueueEntry *queueEntry = dequeue(&lightingQueue);
+        QueueEntry *queueEntry = dequeue(targetQueue);
         if (queueEntry == NULL)
         {
             continue;
@@ -1368,12 +1368,12 @@ void propagateLightBFS(int isBlockLight)
             neighborLightingChunk->lightDirty = 1;
 
             setLight(&neighborLightingChunk->lightData[neighborIndex], getLight(curLightingChunk->lightData[blockIndex]) - 1);
-            enqueue(&lightingQueue, (int)neighborLightingChunk->blocks[neighborIndex].x, (int)neighborLightingChunk->blocks[neighborIndex].y, (int)neighborLightingChunk->blocks[neighborIndex].z);
+            enqueue(targetQueue, (int)neighborLightingChunk->blocks[neighborIndex].x, (int)neighborLightingChunk->blocks[neighborIndex].y, (int)neighborLightingChunk->blocks[neighborIndex].z);
         }
     }
 }
 
-void seedNeighborBorderBlockLighting(Chunk *chunk)
+void seedNeighborBorderBlockLighting(Queue *targetQueue, Chunk *chunk)
 {
     const int chunkXUnit = ChunkWidthX * BlockWidthX;
     const int chunkZUnit = ChunkLengthZ * BlockLengthZ;
@@ -1450,7 +1450,7 @@ void seedNeighborBorderBlockLighting(Chunk *chunk)
                     SET_BLOCK_LIGHT(chunk->lightData[curIndex], neighborLight - 1);
 
                     enqueue(
-                        &lightingQueue,
+                        targetQueue,
                         chunk->blocks[curIndex].x,
                         chunk->blocks[curIndex].y,
                         chunk->blocks[curIndex].z
@@ -1462,7 +1462,7 @@ void seedNeighborBorderBlockLighting(Chunk *chunk)
 }
 
 
-void seedNeighborBorderSkyLighting(Chunk *chunk)
+void seedNeighborBorderSkyLighting(Queue *targetQueue, Chunk *chunk)
 {
     const int chunkXUnit = ChunkWidthX * BlockWidthX;
     const int chunkZUnit = ChunkLengthZ * BlockLengthZ;
@@ -1539,7 +1539,7 @@ void seedNeighborBorderSkyLighting(Chunk *chunk)
                     SET_SKYLIGHT(chunk->lightData[curIndex], neighborLight - 1);
 
                     enqueue(
-                        &lightingQueue,
+                        targetQueue,
                         chunk->blocks[curIndex].x,
                         chunk->blocks[curIndex].y,
                         chunk->blocks[curIndex].z
@@ -1552,18 +1552,15 @@ void seedNeighborBorderSkyLighting(Chunk *chunk)
 
 void computeInitialLightingForChunk(Chunk *chunk) {
     // this function is only called when the chunk has entered the render radius
-
     chunk->isInitialLightCreated = 1;
     resetLightingQueue(&lightingQueue);
-    int skylightEmissiveBlocks[32768];
-    int amtSkylightEmissiveBlocks = 0;
 
     // this step is to zero the chunk's block light and compute the skylight for the chunk
     for (int x = 0; x < ChunkWidthX; x++)
     {
         for (int z = 0; z < ChunkLengthZ; z++)
         {
-            uint8_t currentLight = 5;
+            uint8_t currentLight = BASELINE_SKYLIGHT_VALUE;
             for (int y = ChunkHeightY - 1; y >= 0; y--)
             {
                 int index = x + z * (ChunkWidthX) + y * (ChunkWidthX * ChunkLengthZ);
@@ -1579,12 +1576,16 @@ void computeInitialLightingForChunk(Chunk *chunk) {
                 }
 
                 if (currentLight) {
-                    // if the block is above ground, make it an emitter (cannot enqueue it here since it will later do the block enqueuing later)
-                    skylightEmissiveBlocks[amtSkylightEmissiveBlocks++] = index;
+                    // if the block is above ground, make it an emitter and enqueue ot
+                    enqueue(&lightingQueue, (int)(curBlock->x), (int)(curBlock->y), (int)(curBlock->z));
                 }
             }
         }
     }
+
+    seedNeighborBorderSkyLighting(&lightingQueue, chunk);
+    propagateLightBFS(&lightingQueue, 0);     
+
 
     chunk->lightDirty = 1;
 
@@ -1620,16 +1621,6 @@ void computeInitialLightingForChunk(Chunk *chunk) {
         }
     }
 
-    seedNeighborBorderBlockLighting(chunk);
-    propagateLightBFS(1);
-
-
-
-    
-    resetLightingQueue(&lightingQueue);
-    for (int i = 0; i < amtSkylightEmissiveBlocks; i++) {
-        enqueue(&lightingQueue, (int)chunk->blocks[skylightEmissiveBlocks[i]].x, (int)chunk->blocks[skylightEmissiveBlocks[i]].y, (int)chunk->blocks[skylightEmissiveBlocks[i]].z);
-    }
-    seedNeighborBorderSkyLighting(chunk);
-    propagateLightBFS(0);     
+    seedNeighborBorderBlockLighting(&lightingQueue, chunk);
+    propagateLightBFS(&lightingQueue, 1);
 } 

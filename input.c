@@ -83,7 +83,45 @@ void handleKeyUp(unsigned char key, int x, int y)
 {
     pressedKeys[key] = 0;
 }
+// void blockPlacingOrBreakingLightingRecalculation(Chunk *chunk)
+// {
+//     int chunkXUnit = ChunkWidthX * BlockWidthX;
+//     int chunkZUnit = ChunkLengthZ * BlockLengthZ;
 
+//     resetLightingQueue(&lightingQueue);
+//     for (int dx = -1; dx <= 1; dx++)
+//     {
+//         for (int dz = -1; dz <= 1; dz++)
+//         {
+//             uint64_t chunkKey = packChunkKey(
+//                 (int)((chunk->chunkStartX + dx * chunkXUnit) / (chunkXUnit)),
+//                 (int)((chunk->chunkStartZ + dz * chunkZUnit) / (chunkZUnit)));
+
+//             BucketEntry *result = getHashmapEntry(chunkKey);
+
+//             if (result != NULL)
+//             {
+//                 result->chunkEntry->lightDirty = 1;
+//                 for (int i = 0; i < 32768; i++)
+//                 {
+//                     if (blockRegistry[result->chunkEntry->blocks[i].blockType].lightEmissivePower && !result->chunkEntry->blocks[i].isAir)
+//                     {
+//                         enqueue(&lightingQueue, result->chunkEntry->blocks[i].x, result->chunkEntry->blocks[i].y, result->chunkEntry->blocks[i].z);
+//                         SET_BLOCK_LIGHT(result->chunkEntry->lightData[i], blockRegistry[result->chunkEntry->blocks[i].blockType].lightEmissivePower);
+//                     }
+//                     else
+//                     {
+//                         SET_BLOCK_LIGHT(result->chunkEntry->lightData[i], 0);
+//                     }
+//                 }
+//             }
+
+//             // seedNeighborBorderBlockLighting(&lightingQueue, result->chunkEntry);
+//         }
+//     }
+
+//     propagateLightBFS(&lightingQueue, 1);
+// }
 
 void blockPlacingOrBreakingLightingRecalculation(Chunk *chunk)
 {
@@ -91,6 +129,10 @@ void blockPlacingOrBreakingLightingRecalculation(Chunk *chunk)
     int chunkZUnit = ChunkLengthZ * BlockLengthZ;
 
     resetLightingQueue(&lightingQueue);
+
+    Queue tempSkylightLightingQueue;
+    resetLightingQueue(&tempSkylightLightingQueue);
+
     for (int dx = -1; dx <= 1; dx++)
     {
         for (int dz = -1; dz <= 1; dz++)
@@ -100,30 +142,77 @@ void blockPlacingOrBreakingLightingRecalculation(Chunk *chunk)
                 (int)((chunk->chunkStartZ + dz * chunkZUnit) / (chunkZUnit)));
 
             BucketEntry *result = getHashmapEntry(chunkKey);
-
+            
+            resetLightingQueue(&tempSkylightLightingQueue);
+            resetLightingQueue(&lightingQueue);
             if (result != NULL)
             {
                 result->chunkEntry->lightDirty = 1;
-                for (int i = 0; i < 32768; i++)
+                for (int x = 0; x < ChunkWidthX; x++)
                 {
-                    if (blockRegistry[result->chunkEntry->blocks[i].blockType].lightEmissivePower && !result->chunkEntry->blocks[i].isAir)
+                    for (int z = 0; z < ChunkLengthZ; z++)
                     {
-                        enqueue(&lightingQueue, result->chunkEntry->blocks[i].x, result->chunkEntry->blocks[i].y, result->chunkEntry->blocks[i].z);
-                        SET_BLOCK_LIGHT(result->chunkEntry->lightData[i], blockRegistry[result->chunkEntry->blocks[i].blockType].lightEmissivePower);
-                    }
-                    else
-                    {
-                        SET_BLOCK_LIGHT(result->chunkEntry->lightData[i], 0);
+                        uint8_t currentLight = BASELINE_SKYLIGHT_VALUE;
+                        for (int y = ChunkHeightY - 1; y >= 0; y--) {
+                            int index = x + z * ChunkWidthX + y * ChunkWidthX * ChunkLengthZ;
+                            if (blockRegistry[result->chunkEntry->blocks[index].blockType].lightEmissivePower && !result->chunkEntry->blocks[index].isAir)
+                            {
+                                enqueue(&lightingQueue, result->chunkEntry->blocks[index].x, result->chunkEntry->blocks[index].y, result->chunkEntry->blocks[index].z);
+                                SET_BLOCK_LIGHT(result->chunkEntry->lightData[index], blockRegistry[result->chunkEntry->blocks[index].blockType].lightEmissivePower);
+                            }
+                            else
+                            {
+                                SET_BLOCK_LIGHT(result->chunkEntry->lightData[index], 0);
+                            }
+
+
+                            Block *curBlock = &result->chunkEntry->blocks[index];
+                            uint8_t originalLight = result->chunkEntry->lightData[index];
+                            SET_SKYLIGHT(result->chunkEntry->lightData[index], (uint8_t)(currentLight));
+                            if (!curBlock->isAir && currentLight) {
+                                currentLight = 0;
+                            }
+
+                            if (currentLight) {
+                                // if the block is above ground, make it an emitter and enqueue ot
+                                enqueue(&tempSkylightLightingQueue, (int)(curBlock->x), (int)(curBlock->y), (int)(curBlock->z));
+                            }
+                        }
                     }
                 }
-            }
 
-            seedNeighborBorderBlockLighting(result->chunkEntry);
+                propagateLightBFS(&tempSkylightLightingQueue, 0); 
+                propagateLightBFS(&lightingQueue, 1);
+            }
         }
     }
 
-    propagateLightBFS(1);
+
+    for (int dx = -1; dx <= 1; dx++)
+    {
+        for (int dz = -1; dz <= 1; dz++)
+        {
+            uint64_t chunkKey = packChunkKey(
+                (int)((chunk->chunkStartX + dx * chunkXUnit) / (chunkXUnit)),
+                (int)((chunk->chunkStartZ + dz * chunkZUnit) / (chunkZUnit)));
+
+            BucketEntry *result = getHashmapEntry(chunkKey);
+            
+            resetLightingQueue(&tempSkylightLightingQueue);
+            resetLightingQueue(&lightingQueue);
+            if (result != NULL)
+            {
+                seedNeighborBorderBlockLighting(&lightingQueue, result->chunkEntry);
+                seedNeighborBorderSkyLighting(&tempSkylightLightingQueue, result->chunkEntry);
+                propagateLightBFS(&tempSkylightLightingQueue, 0); 
+                propagateLightBFS(&lightingQueue, 1);
+            }
+        }
+    }
+    
+     
 }
+
 
 void handleMouse(int button, int state, int x_, int y_)
 {

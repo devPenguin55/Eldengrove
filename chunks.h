@@ -120,6 +120,8 @@ typedef struct Queue
 
 #define SEA_LEVEL 35
 
+#define BASELINE_SKYLIGHT_VALUE 10
+
 // upper is more left and bigger, lower is more right and smaller
 #define GET_SKYLIGHT(b) (((b) >> 4) & 0xF)                           // upper 4 bits
 #define GET_BLOCK_LIGHT(b) ((b) & 0xF)                               // lower 4 bits
@@ -127,6 +129,7 @@ typedef struct Queue
 #define SET_BLOCK_LIGHT(b, s) ((b) = ((b) & 0xF0) | ((s) & 0xF))     // clear lower 4 bits and insert block light
 
 #define IS_CELL_SOLID(cell) ((cell).blockType != BLOCK_TYPE_AIR)
+
 
 extern float BlockWidthX;
 extern float BlockLengthZ;
@@ -143,8 +146,8 @@ void deleteChunkMesh(Chunk *chunk);
 void resetLightingQueue(Queue *queue);
 void enqueue(Queue *queue, int worldX, int worldY, int worldZ);
 QueueEntry *dequeue(Queue *queue);
-void propagateLightBFS(int isBlockLight);
-void seedNeighborBorderBlockLighting(Chunk *chunk);
-void seedNeighborBorderSkyLighting(Chunk *chunk);
+void propagateLightBFS(Queue *targetQueue, int isBlockLight);
+void seedNeighborBorderBlockLighting(Queue *targetQueue, Chunk *chunk);
+void seedNeighborBorderSkyLighting(Queue *targetQueue, Chunk *chunk);
 void computeInitialLightingForChunk(Chunk *chunk);
 #endif
