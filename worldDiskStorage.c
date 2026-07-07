@@ -88,7 +88,7 @@ void saveChunkToDisk(Chunk *chunk) {
 
     int voxelCount = ChunkWidthX * ChunkLengthZ * ChunkHeightY;
     fwrite(chunk->blocks, sizeof(Block), voxelCount, file);
-    fwrite(chunk->lightData, sizeof(uint8_t), voxelCount, file);
+    // fwrite(chunk->lightData, sizeof(uint8_t), voxelCount, file);
     
     fclose(file);
     chunk->isDirty = 0;
@@ -109,7 +109,7 @@ void fetchChunkFromDisk(int chunkX, int chunkZ, Chunk *writeChunk) {
 
     int voxelCount = ChunkWidthX * ChunkLengthZ * ChunkHeightY;
     fread(writeChunk->blocks, sizeof(Block), voxelCount, file);
-    fread(writeChunk->lightData, sizeof(uint8_t), voxelCount, file);
+    // fread(writeChunk->lightData, sizeof(uint8_t), voxelCount, file);
 
     writeChunk->isInitialLightCreated = 0;
     fclose(file); 

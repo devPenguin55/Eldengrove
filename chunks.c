@@ -1213,6 +1213,7 @@ void deleteChunkMesh(Chunk *chunk)
     }
 
     // printf("New starting quad index is at %d\n", chunkMeshQuads.amtQuads);
+    renderChunkLoadInForNeighbors(chunk);
 }
 
 void resetLightingQueue(Queue *queue)
@@ -1375,6 +1376,7 @@ void propagateLightBFS(int isBlockLight)
 
 void renderChunkLoadInForNeighbors(Chunk *chunk)
 {
+    return;
     int chunkXUnit = ChunkWidthX * BlockWidthX;
     int chunkZUnit = ChunkLengthZ * BlockLengthZ;
 
@@ -1420,6 +1422,94 @@ void renderChunkLoadInForNeighbors(Chunk *chunk)
     chunk->isInitialLightCreated = 1;
 
     propagateLightBFS(1);
+}
+
+void seedNeighborBorderLighting(Chunk *chunk)
+{
+    const int chunkXUnit = ChunkWidthX * BlockWidthX;
+    const int chunkZUnit = ChunkLengthZ * BlockLengthZ;
+
+    const int offsets[4][2] = {
+        {-1, 0},
+        { 1, 0},
+        { 0,-1},
+        { 0, 1}
+    };
+
+    for (int n = 0; n < 4; n++)
+    {
+        int dx = offsets[n][0];
+        int dz = offsets[n][1];
+
+        uint64_t key = packChunkKey(
+            chunk->chunkStartX / chunkXUnit + dx,
+            chunk->chunkStartZ / chunkZUnit + dz
+        );
+
+        BucketEntry *entry = getHashmapEntry(key);
+        if (!entry) {
+            continue;
+        }
+
+        Chunk *neighbor = entry->chunkEntry;
+
+        for (int y = 0; y < ChunkHeightY; y++)
+        {
+            for (int t = 0; t < ChunkWidthX; t++)
+            {
+                int cx, cz, nx, nz;
+
+                if (dx == -1)
+                {
+                    cx = 0;
+                    cz = t;
+                    nx = ChunkWidthX - 1;
+                    nz = t;
+                }
+                else if (dx == 1)
+                {
+                    cx = ChunkWidthX - 1;
+                    cz = t;
+                    nx = 0;
+                    nz = t;
+                }
+                else if (dz == -1)
+                {
+                    cx = t;
+                    cz = 0;
+                    nx = t;
+                    nz = ChunkLengthZ - 1;
+                }
+                else
+                {
+                    cx = t;
+                    cz = ChunkLengthZ - 1;
+                    nx = t;
+                    nz = 0;
+                }
+
+                int curIndex = cx + cz * ChunkWidthX + y * ChunkWidthX * ChunkLengthZ;
+                int neighIndex = nx + nz * ChunkWidthX + y * ChunkWidthX * ChunkLengthZ;
+
+                uint8_t neighborLight = GET_BLOCK_LIGHT(neighbor->lightData[neighIndex]);
+
+                if (neighborLight <= 1)
+                    continue;
+
+                if (GET_BLOCK_LIGHT(chunk->lightData[curIndex]) < neighborLight - 1)
+                {
+                    SET_BLOCK_LIGHT(chunk->lightData[curIndex], neighborLight - 1);
+
+                    enqueue(
+                        &lightingQueue,
+                        chunk->blocks[curIndex].x,
+                        chunk->blocks[curIndex].y,
+                        chunk->blocks[curIndex].z
+                    );
+                }
+            }
+        }
+    }
 }
 
 void computeInitialLightingForChunk(Chunk *chunk) {
@@ -1483,6 +1573,7 @@ void computeInitialLightingForChunk(Chunk *chunk) {
         }
     }
 
+    seedNeighborBorderLighting(chunk);
     propagateLightBFS(1);
     
     // resetLightingQueue(&lightingQueue);
@@ -1493,5 +1584,7 @@ void computeInitialLightingForChunk(Chunk *chunk) {
     // propagateLightBFS(0); 
     // printf("end\n");
     
+    
+
     
 } 
