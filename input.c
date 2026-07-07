@@ -83,6 +83,8 @@ void handleKeyUp(unsigned char key, int x, int y)
 {
     pressedKeys[key] = 0;
 }
+
+
 void blockPlacingOrBreakingLightingRecalculation(Chunk *chunk)
 {
     int chunkXUnit = ChunkWidthX * BlockWidthX;
@@ -115,11 +117,14 @@ void blockPlacingOrBreakingLightingRecalculation(Chunk *chunk)
                     }
                 }
             }
+
+            seedNeighborBorderBlockLighting(result->chunkEntry);
         }
     }
 
     propagateLightBFS(1);
 }
+
 void handleMouse(int button, int state, int x_, int y_)
 {
     // button: GLUT_LEFT_BUTTON, GLUT_RIGHT_BUTTON, etc.
