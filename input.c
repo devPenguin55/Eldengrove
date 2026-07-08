@@ -174,8 +174,25 @@ void blockPlacingOrBreakingLightingRecalculation(Chunk *chunk)
                             }
 
                             if (currentLight) {
-                                // if the block is above ground, make it an emitter and enqueue ot
-                                enqueue(&tempSkylightLightingQueue, (int)(curBlock->x), (int)(curBlock->y), (int)(curBlock->z));
+                                int isNearSolidBlock = 0;
+
+                                for (int dx = -1; dx <= 1; dx++) {
+                                    for (int dy = -1; dy <= 1; dy++) {
+                                        for (int dz = -1; dz <= 1; dz++) {
+                                            int nIdx = (x+dx) + (z+dz) * (ChunkWidthX) + (y+dy) * (ChunkWidthX * ChunkLengthZ);
+                                            if (nIdx < 0 || nIdx >= ChunkWidthX * ChunkLengthZ * ChunkHeightY) { continue; }
+                                            if (!result->chunkEntry->blocks[nIdx].isAir) {
+                                                isNearSolidBlock = 1;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if (isNearSolidBlock) {
+                                    // if the block is above ground, make it an emitter and enqueue ot
+                                    enqueue(&tempSkylightLightingQueue, (int)(curBlock->x), (int)(curBlock->y), (int)(curBlock->z));
+                                }
                             }
                         }
                     }
