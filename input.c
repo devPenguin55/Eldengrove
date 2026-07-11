@@ -169,11 +169,11 @@ void blockPlacingOrBreakingLightingRecalculation(Chunk *chunk)
                             Block *curBlock = &result->chunkEntry->blocks[index];
                             uint8_t originalLight = result->chunkEntry->lightData[index];
                             SET_SKYLIGHT(result->chunkEntry->lightData[index], (uint8_t)(currentLight));
-                            if (!curBlock->isAir && currentLight) {
+                            if (!curBlock->isAir && currentLight && blockRegistry[curBlock->blockType].isRenderSolid) {
                                 currentLight = 0;
                             }
 
-                            if (currentLight) {
+                            if (currentLight) { 
                                 int isNearSolidBlock = 0;
 
                                 for (int dx = -1; dx <= 1; dx++) {

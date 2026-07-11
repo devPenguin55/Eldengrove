@@ -120,7 +120,7 @@ typedef struct Queue
 
 #define SEA_LEVEL 35
 
-#define BASELINE_SKYLIGHT_VALUE 10
+#define BASELINE_SKYLIGHT_VALUE 15
 
 // upper is more left and bigger, lower is more right and smaller
 #define GET_SKYLIGHT(b) (((b) >> 4) & 0xF)                           // upper 4 bits

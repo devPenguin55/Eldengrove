@@ -1571,7 +1571,7 @@ void computeInitialLightingForChunk(Chunk *chunk) {
                 SET_SKYLIGHT(chunk->lightData[index], (uint8_t)(currentLight));
                 SET_BLOCK_LIGHT(chunk->lightData[index], 0);
 
-                if (!curBlock->isAir && currentLight) {
+                if (!curBlock->isAir && currentLight && blockRegistry[curBlock->blockType].isRenderSolid) {
                     currentLight = 0;
                 }
 
@@ -1591,7 +1591,7 @@ void computeInitialLightingForChunk(Chunk *chunk) {
                         }
                     }
 
-                    if (isNearSolidBlock) {
+                    if (isNearSolidBlock ) {
                         // if the block is above ground, make it an emitter and enqueue ot
                         enqueue(&lightingQueue, (int)(curBlock->x), (int)(curBlock->y), (int)(curBlock->z));
                     }

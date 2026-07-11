@@ -45,6 +45,20 @@ float getLight(int x, int y, int z)
     return brightness;
 }
 
+float getFaceShade(int face)
+{
+    switch (face)
+    {
+        case FACE_TOP:    return 1.0;
+        case FACE_BOTTOM: return 0.9;
+        case FACE_FRONT:
+        case FACE_BACK:   return 0.97;
+        case FACE_LEFT:
+        case FACE_RIGHT:  return 0.93;
+        default:          return 1.0;
+    }
+}
+
 void main()
 {
     int layer = int(fragLayer);
@@ -134,11 +148,14 @@ void main()
         }
         if (fragFace != FACE_CROSS) {
             
-            texColor.rgb *= getLight(int(floor(x)), int(floor(y)), int(floor(z)));
+            texColor.rgb *= getLight(int(floor(x)), int(floor(y)), int(floor(z))) * getFaceShade(fragFace);
+            
         } else {
             texColor.rgb *= getLight(int(round(worldPos.x)), int(round(worldPos.y)), int(round(worldPos.z)));
         }
     }
+
+    
 
     fragColor = texColor;
     
