@@ -1575,6 +1575,10 @@ void computeInitialLightingForChunk(Chunk *chunk) {
                     currentLight = 0;
                 }
 
+                if (!curBlock->isAir && currentLight && !blockRegistry[curBlock->blockType].isRenderSolid) {
+                    currentLight-=3;
+                }
+
                 if (currentLight) {
                     int isNearSolidBlock = 0;
 
