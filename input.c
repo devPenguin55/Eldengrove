@@ -540,8 +540,8 @@ void handleUserMovement()
         moveX /= length;
         moveZ /= length;
     }
-    player.velocity.x = moveX * 5;
-    player.velocity.z = moveZ * 5;
+    player.velocity.x = moveX * 1.5;
+    player.velocity.z = moveZ * 1.5;
 
     // hotbar selection (keys 1–9)
     if (pressedKeys['1'])
