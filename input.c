@@ -20,7 +20,7 @@ Player player = (Player){
     .velocity.z = 0,
     .isOnGround = 0,
     .isInWater = 0,
-    .width = 0.75f,
+    .width = 1.0f,
     .height = 1.8f};
 GLfloat EYE_HEIGHT_OFFSET = 1.62f;
 GLfloat eyeX;
