@@ -20,12 +20,14 @@ Player player = (Player){
     .velocity.z = 0,
     .isOnGround = 0,
     .isInWater = 0,
-    .width = 1.0f,
+    .width = 0.75f,
     .height = 1.8f};
 GLfloat EYE_HEIGHT_OFFSET = 1.62f;
 GLfloat eyeX;
 GLfloat eyeY;
 GLfloat eyeZ;
+
+const float blockMoveSpd = 2.5f;
 
 int DEV_MODE = 0;
 
@@ -449,12 +451,12 @@ void handleMovingMouse(int x, int y)
 
 int slopeDir(Player* player) { 
 
-    float minX = player->position.x - playerHalfWidth(player); 
-    float maxX = player->position.x + playerHalfWidth(player); 
+    float minX = player->position.x - 0.5f; 
+    float maxX = player->position.x + 0.5f; 
     float minY = player->position.y; 
     float maxY = player->position.y + player->height; 
-    float minZ = player->position.z - playerHalfWidth(player); 
-    float maxZ = player->position.z + playerHalfWidth(player); 
+    float minZ = player->position.z - 0.5f; 
+    float maxZ = player->position.z + 0.5f; 
 
     int voxelMinX = (int)round(minX); 
     int voxelMaxX = (int)round(maxX); 
@@ -463,7 +465,6 @@ int slopeDir(Player* player) {
     int voxelMinZ = (int)round(minZ); 
     int voxelMaxZ = (int)round(maxZ); 
 
-    printf("%d %d\n", voxelMinX, voxelMaxX);
     for (int x = voxelMinX; x <= voxelMaxX; x++) { 
         for (int y = voxelMinY; y <= voxelMaxY; y++) { 
             for (int z = voxelMinZ; z <= voxelMaxZ; z++) { 
@@ -570,14 +571,14 @@ void handleUserMovement()
                 projectedY = -moveX;
                 break;
         }
-    
-        player.velocity.x = projectedX * 1.5f;
+        
+        
+        player.velocity.x = projectedX * blockMoveSpd;
         if (slopeDir(&player) != -1)// && player.isOnGround)
         {
-            printf("%f\n", DELTA_TIME);
-            player.velocity.y = -projectedY * 1.5f;
+            player.velocity.y = -projectedY * blockMoveSpd;
         }
-        player.velocity.z = projectedZ * 1.5f;
+        player.velocity.z = projectedZ * blockMoveSpd;
     }
 
     // hotbar selection (keys 1–9)

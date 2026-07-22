@@ -138,8 +138,32 @@ int playerCollides(Player* player) {
 
                 if (blockRegistry[block->blockType].isPhysicsSolid && !block->isAir) { 
                     if (block->isSlope) { 
-                        float localBlockX = player->position.x - block->x; 
-                        float localBlockZ = player->position.z - block->z; 
+                        // float localBlockX = player->position.x - block->x; 
+                        // float localBlockZ = player->position.z - block->z; 
+                        float checkX = player->position.x;
+                        float checkZ = player->position.z;
+
+                        switch (block->isSlope)
+                        {
+                            case 1:
+                                checkZ = player->position.z + playerHalfWidth(player);
+                                break;
+
+                            case 2:
+                                checkX = player->position.x + playerHalfWidth(player);
+                                break;
+
+                            case 3:
+                                checkZ = player->position.z - playerHalfWidth(player);
+                                break;
+
+                            case 4:
+                                checkX = player->position.x - playerHalfWidth(player);
+                                break;
+                        }
+
+                        float localBlockX = checkX - block->x;
+                        float localBlockZ = checkZ - block->z;
 
                         float rampHeightLocal; 
                         switch (block->isSlope) { 
