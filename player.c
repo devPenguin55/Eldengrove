@@ -172,9 +172,9 @@ void updatePlayerPhysics(Player* player)
 {
     const float gravity = (player->isInWater) ? (5.0f) : (20.0f);
     int slopeDirCur = slopeDir(player);
-    if (slopeDirCur == -1) {
-        player->velocity.y -= gravity * DELTA_TIME;
-    }
+    // if (slopeDirCur == -1) {
+    player->velocity.y -= gravity * DELTA_TIME;
+    // }
     
     player->isOnGround = 0;
 
