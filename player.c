@@ -133,18 +133,23 @@ int playerCollides(Player* player) {
         for (int y = voxelMinY; y <= voxelMaxY; y++) { 
             for (int z = voxelMinZ; z <= voxelMaxZ; z++) { 
                 Block *block = blockAtPosition(x,y,z); 
+
                 if (block == NULL) { continue; } 
+
                 if (blockRegistry[block->blockType].isPhysicsSolid && !block->isAir) { 
                     if (block->isSlope) { 
                         float localBlockX = player->position.x - block->x; 
                         float localBlockZ = player->position.z - block->z; 
-                        float rampHeightLocal; switch (block->isSlope) { 
+
+                        float rampHeightLocal; 
+                        switch (block->isSlope) { 
                             case 1: rampHeightLocal = 1 - localBlockZ; break; 
                             case 2: rampHeightLocal = 1 - localBlockX; break; 
-                            case 3: rampHeightLocal = 1 - fabs(localBlockZ); break; 
-                            case 4: rampHeightLocal = 1 - fabs(localBlockX); break; 
+                            case 3: rampHeightLocal = 1 - fabsf(localBlockZ); break; 
+                            case 4: rampHeightLocal = 1 - fabsf(localBlockX); break; 
                             default: rampHeightLocal = 0; break; 
                         } 
+
                         rampHeightLocal += block->y; 
                         if ((rampHeightLocal - minY) > 0.55f) { 
                             return 1; 
@@ -166,9 +171,10 @@ int playerCollides(Player* player) {
 void updatePlayerPhysics(Player* player)
 {
     const float gravity = (player->isInWater) ? (5.0f) : (20.0f);
-    
-    
-    player->velocity.y -= gravity * DELTA_TIME;
+    int slopeDirCur = slopeDir(player);
+    if (slopeDirCur == -1) {
+        player->velocity.y -= gravity * DELTA_TIME;
+    }
     
     player->isOnGround = 0;
 
@@ -178,42 +184,25 @@ void updatePlayerPhysics(Player* player)
 
     player->position.x += player->velocity.x * DELTA_TIME;
 
-    if (playerCollides(player))
+    if (playerCollides(player) && slopeDirCur == -1)
     {
-        int steppedUp = 0;
-
-        for (int i = 1; i <= 8; i++)
-        {
-            player->position.y = oldY + i * 0.01f;
-
-            if (!playerCollides(player))
-            {
-                steppedUp = 1;
-                break;
-            }
-        }
-
-        if (!steppedUp)
-        {
-            player->position.x = oldX;
-            player->position.y = oldY;
-            player->velocity.x = 0;
-        }
+        player->position.x -= player->velocity.x * DELTA_TIME;
+        player->velocity.x = 0;
     }
 
     player->position.z += player->velocity.z * DELTA_TIME;
-    if (playerCollides(player))
+    if (playerCollides(player) && slopeDirCur == -1)
     {
         player->position.z -= player->velocity.z * DELTA_TIME;
         player->velocity.z = 0;
     }
 
-    // slope handling
-    int feetY = (int)floor(player->position.y - 0.05f);
-    Block *feetBlock = blockAtPosition(
-        (int)floor(player->position.x),
-        feetY,
-        (int)floor(player->position.z));
+    // // slope handling
+    // int feetY = (int)floor(player->position.y - 0.05f);
+    // Block *feetBlock = blockAtPosition(
+    //     (int)floor(player->position.x),
+    //     feetY,
+    //     (int)floor(player->position.z));
 
     // if (feetBlock == NULL || feetBlock->isAir || !feetBlock->isSlope)
     // {
@@ -273,7 +262,7 @@ void updatePlayerPhysics(Player* player)
 
     if (!slopeHandledThisFrame) {
         player->position.y += player->velocity.y * DELTA_TIME;
-        if (playerCollides(player))
+        if (playerCollides(player))// && slopeDirCur == -1)
         {
             if (player->velocity.y > 0)
             {

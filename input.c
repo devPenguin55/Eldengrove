@@ -83,45 +83,6 @@ void handleKeyUp(unsigned char key, int x, int y)
 {
     pressedKeys[key] = 0;
 }
-// void blockPlacingOrBreakingLightingRecalculation(Chunk *chunk)
-// {
-//     int chunkXUnit = ChunkWidthX * BlockWidthX;
-//     int chunkZUnit = ChunkLengthZ * BlockLengthZ;
-
-//     resetLightingQueue(&lightingQueue);
-//     for (int dx = -1; dx <= 1; dx++)
-//     {
-//         for (int dz = -1; dz <= 1; dz++)
-//         {
-//             uint64_t chunkKey = packChunkKey(
-//                 (int)((chunk->chunkStartX + dx * chunkXUnit) / (chunkXUnit)),
-//                 (int)((chunk->chunkStartZ + dz * chunkZUnit) / (chunkZUnit)));
-
-//             BucketEntry *result = getHashmapEntry(chunkKey);
-
-//             if (result != NULL)
-//             {
-//                 result->chunkEntry->lightDirty = 1;
-//                 for (int i = 0; i < 32768; i++)
-//                 {
-//                     if (blockRegistry[result->chunkEntry->blocks[i].blockType].lightEmissivePower && !result->chunkEntry->blocks[i].isAir)
-//                     {
-//                         enqueue(&lightingQueue, result->chunkEntry->blocks[i].x, result->chunkEntry->blocks[i].y, result->chunkEntry->blocks[i].z);
-//                         SET_BLOCK_LIGHT(result->chunkEntry->lightData[i], blockRegistry[result->chunkEntry->blocks[i].blockType].lightEmissivePower);
-//                     }
-//                     else
-//                     {
-//                         SET_BLOCK_LIGHT(result->chunkEntry->lightData[i], 0);
-//                     }
-//                 }
-//             }
-
-//             // seedNeighborBorderBlockLighting(&lightingQueue, result->chunkEntry);
-//         }
-//     }
-
-//     propagateLightBFS(&lightingQueue, 1);
-// }
 
 void blockPlacingOrBreakingLightingRecalculation(Chunk *chunk)
 {
@@ -486,6 +447,43 @@ void handleMovingMouse(int x, int y)
     glutWarpPointer(windowCenterX, windowCenterY);
 }
 
+int slopeDir(Player* player) { 
+
+    float minX = player->position.x - playerHalfWidth(player); 
+    float maxX = player->position.x + playerHalfWidth(player); 
+    float minY = player->position.y; 
+    float maxY = player->position.y + player->height; 
+    float minZ = player->position.z - playerHalfWidth(player); 
+    float maxZ = player->position.z + playerHalfWidth(player); 
+
+    int voxelMinX = (int)round(minX); 
+    int voxelMaxX = (int)round(maxX); 
+    int voxelMinY = (int)round(minY); 
+    int voxelMaxY = (int)round(maxY); 
+    int voxelMinZ = (int)round(minZ); 
+    int voxelMaxZ = (int)round(maxZ); 
+
+    for (int x = voxelMinX; x <= voxelMaxX; x++) { 
+        for (int y = voxelMinY; y <= voxelMaxY; y++) { 
+            for (int z = voxelMinZ; z <= voxelMaxZ; z++) { 
+                Block *block = blockAtPosition(x,y,z); 
+
+                if (block == NULL) { continue; } 
+
+                if (blockRegistry[block->blockType].isPhysicsSolid && !block->isAir) { 
+                    if (block->isSlope) { 
+                        return block->isSlope;
+                    } else { 
+                        continue;
+                    } 
+                } 
+            } 
+        } 
+    } 
+
+    return -1; 
+}
+
 void handleUserMovement()
 {
     GLfloat RightX = PlayerDirZ; // perpendicular on XZ plane
@@ -540,8 +538,46 @@ void handleUserMovement()
         moveX /= length;
         moveZ /= length;
     }
-    player.velocity.x = moveX * 1.5;
-    player.velocity.z = moveZ * 1.5;
+
+    if (length > 0.0f) {
+
+
+
+        float projectedX = moveX;
+        float projectedY = 0.0f;
+        float projectedZ = moveZ;
+
+
+        switch (slopeDir(&player))
+        {
+            case -1:
+                projectedY = 0.0f;
+                break;
+            case 1:
+                projectedY = moveZ;
+                break;
+
+            case 2:
+                projectedY = moveX;
+                break;
+
+            case 3:
+                projectedY = -moveZ;
+                break;
+
+            case 4:
+                projectedY = -moveX;
+                break;
+        }
+    
+        player.velocity.x = projectedX * 1.5f;
+        if (slopeDir(&player) != -1)// && player.isOnGround)
+        {
+            printf("%d\n", projectedY >= 0);
+            player.velocity.y = -projectedY * 1.5f;
+        }
+        player.velocity.z = projectedZ * 1.5f;
+    }
 
     // hotbar selection (keys 1–9)
     if (pressedKeys['1'])
