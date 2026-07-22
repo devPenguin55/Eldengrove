@@ -172,117 +172,48 @@ void updatePlayerPhysics(Player* player)
 {
     const float gravity = (player->isInWater) ? (5.0f) : (20.0f);
     int slopeDirCur = slopeDir(player);
-    // if (slopeDirCur == -1) {
     player->velocity.y -= gravity * DELTA_TIME;
-    // }
     
     player->isOnGround = 0;
 
-
-    float oldX = player->position.x;
-    float oldY = player->position.y;
+    
 
     player->position.x += player->velocity.x * DELTA_TIME;
 
-    if (playerCollides(player) && slopeDirCur == -1)
+    if (playerCollides(player))
     {
         player->position.x -= player->velocity.x * DELTA_TIME;
         player->velocity.x = 0;
     }
 
     player->position.z += player->velocity.z * DELTA_TIME;
-    if (playerCollides(player) && slopeDirCur == -1)
+    if (playerCollides(player))
     {
         player->position.z -= player->velocity.z * DELTA_TIME;
         player->velocity.z = 0;
     }
 
-    // // slope handling
-    // int feetY = (int)floor(player->position.y - 0.05f);
-    // Block *feetBlock = blockAtPosition(
-    //     (int)floor(player->position.x),
-    //     feetY,
-    //     (int)floor(player->position.z));
-
-    // if (feetBlock == NULL || feetBlock->isAir || !feetBlock->isSlope)
-    // {
-    //     // fallback: also check one layer up in case the rounding above
-    //     // picked the wrong side of a block boundary
-    //     Block *altBlock = blockAtPosition(
-    //         (int)floor(player->position.x),
-    //         feetY + 1,
-    //         (int)floor(player->position.z));
-
-    //     if (altBlock != NULL && !altBlock->isAir && altBlock->isSlope)
-    //     {
-    //         feetBlock = altBlock;
-    //     }
-    // }
-
-    int slopeHandledThisFrame = 0;
-    // if (feetBlock != NULL && !feetBlock->isAir && feetBlock->isSlope && player->velocity.y <= 0.0f)
-    // {
-    //     // printf("stuck %f\n", DELTA_TIME);
-    //     float localBlockX = player->position.x - feetBlock->x;
-    //     float localBlockZ = player->position.z - feetBlock->z;
-        
-    //     float rampHeightLocal;
-    //     switch (feetBlock->isSlope)
-    //     {
-    //         case 1: rampHeightLocal = 1 - localBlockZ; break;
-    //         case 2: rampHeightLocal = 1 - localBlockX; break; // 
-    //         case 3: rampHeightLocal = 1 - fabsf(localBlockZ);  break;
-    //         case 4: rampHeightLocal = 1 - fabsf(localBlockX);  break;
-    //         default: rampHeightLocal = 0; break;
-    //     }
-    //     // printf("%f %f %f\n", localBlockX, localBlockZ, rampHeightLocal);
-
-    //     float rampHeightWorld = feetBlock->y + rampHeightLocal-1;
-    //     if (player->position.y < rampHeightWorld || fabsf(player->position.y - rampHeightWorld) < 0.1f) {
-    //         player->position.y = rampHeightWorld;
-    //         player->velocity.y = 0;
-    //         player->isOnGround = 1;
-    //         slopeHandledThisFrame = 1;
-
-    //         // while (playerCollides(player))
-    //         // {
-    //         //     // switch (feetBlock->isSlope)
-    //         //     // {
-    //         //     //     case 1: rampHeightLocal = player->position.x-=0.0001;
-    //         //     //     case 2: rampHeightLocal = player->position.z-=0.0001;
-    //         //     //     case 3: rampHeightLocal = player->position.x+=0.0001; break;
-    //         //     //     case 4: rampHeightLocal = player->position.z+=0.0001; break;
-    //         //     //     default: rampHeightLocal = 0; break;
-    //         //     // }
-
-    //         //     player->position.y+=0.00001;
-    //         // }
-    //     }
-    // }
-
-    if (!slopeHandledThisFrame) {
-        player->position.y += player->velocity.y * DELTA_TIME;
-        if (playerCollides(player))// && slopeDirCur == -1)
+    player->position.y += player->velocity.y * DELTA_TIME;
+    if (playerCollides(player))
+    {
+        if (player->velocity.y > 0)
         {
-            if (player->velocity.y > 0)
+            while (playerCollides(player) && slopeDirCur == -1)
             {
-                while (playerCollides(player))
-                {
-                    player->position.y -= 0.001f;
-                }
+                player->position.y -= 0.001f;
             }
-            else if (player->velocity.y < 0)
-            {
-                while (playerCollides(player))
-                {
-                    player->position.y += 0.001f;
-                }
-
-                player->isOnGround = 1;
-            }
-
-            player->velocity.y = 0;
         }
+        else if (player->velocity.y < 0)
+        {
+            while (playerCollides(player))
+            {
+                player->position.y += 0.001f;
+            }
+
+            player->isOnGround = 1;
+        }
+
+        player->velocity.y = 0;
     }
 }
 

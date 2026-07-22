@@ -463,6 +463,7 @@ int slopeDir(Player* player) {
     int voxelMinZ = (int)round(minZ); 
     int voxelMaxZ = (int)round(maxZ); 
 
+    printf("%d %d\n", voxelMinX, voxelMaxX);
     for (int x = voxelMinX; x <= voxelMaxX; x++) { 
         for (int y = voxelMinY; y <= voxelMaxY; y++) { 
             for (int z = voxelMinZ; z <= voxelMaxZ; z++) { 
@@ -573,7 +574,7 @@ void handleUserMovement()
         player.velocity.x = projectedX * 1.5f;
         if (slopeDir(&player) != -1)// && player.isOnGround)
         {
-            printf("%d\n", projectedY >= 0);
+            printf("%f\n", DELTA_TIME);
             player.velocity.y = -projectedY * 1.5f;
         }
         player.velocity.z = projectedZ * 1.5f;
