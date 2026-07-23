@@ -132,12 +132,10 @@ void blockPlacingOrBreakingLightingRecalculation(Chunk *chunk)
                             Block *curBlock = &result->chunkEntry->blocks[index];
                             uint8_t originalLight = result->chunkEntry->lightData[index];
                             SET_SKYLIGHT(result->chunkEntry->lightData[index], (uint8_t)(currentLight));
-                            if (!curBlock->isAir && currentLight && blockRegistry[curBlock->blockType].isRenderSolid) {
+                            if (!curBlock->isAir && currentLight && curBlock->blockType == BLOCK_TYPE_WATER) {
+                                currentLight-=3;
+                            } else if (!curBlock->isAir && currentLight && !blockRegistry[curBlock->blockType].isRenderCross) {
                                 currentLight = 0;
-                            }
-
-                            if (!curBlock->isAir && currentLight && !blockRegistry[curBlock->blockType].isRenderSolid) {
-                                currentLight-= 3;
                             }
 
                             if (currentLight) { 
@@ -574,9 +572,15 @@ void handleUserMovement()
         
         
         player.velocity.x = projectedX * blockMoveSpd;
-        if (slopeDir(&player) != -1)// && player.isOnGround)
+        if (slopeDir(&player) != -1)
         {
+            player.isOnGround = 1;
             player.velocity.y = -projectedY * blockMoveSpd;
+            if (pressedKeys[' '] && (player.isOnGround || player.isInWater))
+            {
+                player.velocity.y = 7.5f;
+                player.isOnGround = 0;
+            }
         }
         player.velocity.z = projectedZ * blockMoveSpd;
     }

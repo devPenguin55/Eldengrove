@@ -29,6 +29,7 @@ static inline float clamp(float value, float minVal, float maxVal)
         return maxVal;
     return value;
 }
+
 void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, int flag, uint64_t key)
 {
     chunk->chunkStartX = xAdd;
@@ -263,8 +264,13 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
             if (x < 4 || x >= ChunkWidthX - 4 || z < 4 || z >= ChunkLengthZ - 4)
                 continue;
 
+            // Block *surfaceBlock = &(chunk->blocks[x + ChunkWidthX * z + (ChunkWidthX * ChunkLengthZ) * (surfaceY - 1)]);
+            // if (surfaceBlock->isSlope)
+                // continue;
+
             float worldX = x + chunk->chunkStartX;
             float worldZ = z + chunk->chunkStartZ;
+
 
             int treeValid = !(fbm2D(worldX / 1.5f, worldZ / 1.5f, 5, 2, 2.0, 5.0) <= 0.45f);
             int flowerValid = fbm2D(worldX / 10.f, worldZ / 10.f, 5, 2, 2.0, 5.0) > 0.37f;
@@ -394,6 +400,7 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
         }
     }
 }
+
 void initChunkMeshingSystem()
 {
     chunkMeshQuads.capacity = 16;
@@ -1459,7 +1466,7 @@ void propagateLightBFS(Queue *targetQueue, int isBlockLight)
 
             if (
                 (getLight(neighborLightingChunk->lightData[neighborIndex]) >= (getLight(curLightingChunk->lightData[blockIndex]) - 1)) ||
-                (!neighborLightingChunk->blocks[neighborIndex].isAir && blockRegistry[neighborLightingChunk->blocks[neighborIndex].blockType].isRenderSolid))
+                (!neighborLightingChunk->blocks[neighborIndex].isAir && blockRegistry[neighborLightingChunk->blocks[neighborIndex].blockType].isRenderSolid && !neighborLightingChunk->blocks[neighborIndex].isSlope))
             {
                 continue;
             }
@@ -1668,14 +1675,15 @@ void computeInitialLightingForChunk(Chunk *chunk) {
 
                 SET_SKYLIGHT(chunk->lightData[index], (uint8_t)(currentLight));
                 SET_BLOCK_LIGHT(chunk->lightData[index], 0);
-
-                if (!curBlock->isAir && currentLight && blockRegistry[curBlock->blockType].isRenderSolid) {
+                
+                if (!curBlock->isAir && currentLight && curBlock->blockType == BLOCK_TYPE_WATER) {
+                    currentLight = (currentLight > 3) ? currentLight - 3 : 0;
+                } else if (!curBlock->isAir && currentLight && curBlock->isSlope) {
+                    currentLight = (currentLight > 2) ? currentLight - 2 : 0;
+                } else if (!curBlock->isAir && currentLight && !blockRegistry[curBlock->blockType].isRenderCross) {
                     currentLight = 0;
                 }
 
-                if (!curBlock->isAir && currentLight && !blockRegistry[curBlock->blockType].isRenderSolid) {
-                    currentLight-=3;
-                }
 
                 if (currentLight) {
                     int isNearSolidBlock = 0;
