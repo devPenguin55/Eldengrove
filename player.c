@@ -138,32 +138,32 @@ int playerCollides(Player* player) {
 
                 if (blockRegistry[block->blockType].isPhysicsSolid && !block->isAir) { 
                     if (block->isSlope) { 
-                        // float localBlockX = player->position.x - block->x; 
-                        // float localBlockZ = player->position.z - block->z; 
-                        float checkX = player->position.x;
-                        float checkZ = player->position.z;
+                        float localBlockX = player->position.x - block->x; 
+                        float localBlockZ = player->position.z - block->z; 
+                        // float checkX = player->position.x;
+                        // float checkZ = player->position.z;
 
-                        switch (block->isSlope)
-                        {
-                            case 1:
-                                checkZ = player->position.z + playerHalfWidth(player);
-                                break;
+                        // switch (block->isSlope)
+                        // {
+                        //     case 1:
+                        //         checkZ = player->position.z + playerHalfWidth(player);
+                        //         break;
 
-                            case 2:
-                                checkX = player->position.x + playerHalfWidth(player);
-                                break;
+                        //     case 2:
+                        //         checkX = player->position.x + playerHalfWidth(player);
+                        //         break;
 
-                            case 3:
-                                checkZ = player->position.z - playerHalfWidth(player);
-                                break;
+                        //     case 3:
+                        //         checkZ = player->position.z - playerHalfWidth(player);
+                        //         break;
 
-                            case 4:
-                                checkX = player->position.x - playerHalfWidth(player);
-                                break;
-                        }
+                        //     case 4:
+                        //         checkX = player->position.x - playerHalfWidth(player);
+                        //         break;
+                        // }
 
-                        float localBlockX = checkX - block->x;
-                        float localBlockZ = checkZ - block->z;
+                        // float localBlockX = checkX - block->x;
+                        // float localBlockZ = checkZ - block->z;
 
                         float rampHeightLocal; 
                         switch (block->isSlope) { 
@@ -203,35 +203,73 @@ void updatePlayerPhysics(Player* player)
     
 
     player->position.x += player->velocity.x * DELTA_TIME;
-
+    player->position.y += 0.01;
     if (playerCollides(player))
     {
+        
         player->position.x -= player->velocity.x * DELTA_TIME;
         player->velocity.x = 0;
     }
-
+    player->position.y -= 0.01;
+    
+    player->position.y += 0.01;
     player->position.z += player->velocity.z * DELTA_TIME;
     if (playerCollides(player))
     {
         player->position.z -= player->velocity.z * DELTA_TIME;
         player->velocity.z = 0;
     }
+    player->position.y -= 0.01;
 
     player->position.y += player->velocity.y * DELTA_TIME;
+    // if (playerCollides(player))
+    // {
+    //     if (player->velocity.y > 0)
+    //     {
+    //         while (playerCollides(player))
+    //         {
+    //             player->position.y -= 0.001f;
+    //         }
+    //     }
+    //     else if (player->velocity.y < 0)
+    //     {
+            
+    //         while (playerCollides(player))
+    //         {
+    //             player->position.y += 0.001f;
+    //         }
+
+    //         player->isOnGround = 1;
+    //     }
+
+    //     player->velocity.y = 0;
+    // }
     if (playerCollides(player))
     {
         if (player->velocity.y > 0)
         {
-            while (playerCollides(player) && slopeDirCur == -1)
+            float startY = player->position.y;
+            while (playerCollides(player))
             {
                 player->position.y -= 0.001f;
+                if (startY - player->position.y > 2.0f)
+                {
+                    player->position.y = startY; // couldn't resolve - bail instead of falling forever
+                    break;
+                }
             }
         }
         else if (player->velocity.y < 0)
         {
+            float startY = player->position.y;
             while (playerCollides(player))
             {
                 player->position.y += 0.001f;
+                if (player->position.y - startY > 2.0f)
+                {
+                    player->position.y = startY;
+                    break;
+                }
             }
 
             player->isOnGround = 1;

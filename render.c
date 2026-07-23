@@ -2060,6 +2060,7 @@ void drawGraphics()
         if (userBlockBreakingTimeElapsed >= blockRegistry[blockType].blockBreakingTime && beginBlockBreakingIndex == (x + (ChunkWidthX)*z + (ChunkWidthX * ChunkLengthZ) * y))
         {
             selectedBlockToRender.chunk->blocks[x + (ChunkWidthX)*z + (ChunkWidthX * ChunkLengthZ) * y].isAir = 1;
+            selectedBlockToRender.chunk->blocks[x + (ChunkWidthX)*z + (ChunkWidthX * ChunkLengthZ) * y].isSlope = 0;
             userBlockBreakingTimeElapsed = -1.f;
             selectedBlockToRender.chunk->isDirty = 1;
 

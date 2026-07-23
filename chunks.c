@@ -264,15 +264,15 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
             if (x < 4 || x >= ChunkWidthX - 4 || z < 4 || z >= ChunkLengthZ - 4)
                 continue;
 
-            // Block *surfaceBlock = &(chunk->blocks[x + ChunkWidthX * z + (ChunkWidthX * ChunkLengthZ) * (surfaceY - 1)]);
-            // if (surfaceBlock->isSlope)
-                // continue;
+            Block *surfaceBlock = &(chunk->blocks[x + ChunkWidthX * z + (ChunkWidthX * ChunkLengthZ) * (surfaceY - 1)]);
+            if (surfaceBlock->isSlope)
+                continue;
 
             float worldX = x + chunk->chunkStartX;
             float worldZ = z + chunk->chunkStartZ;
 
 
-            int treeValid = !(fbm2D(worldX / 1.5f, worldZ / 1.5f, 5, 2, 2.0, 5.0) <= 0.45f);
+            int treeValid = !(fbm2D(worldX / 1.5f, worldZ / 1.5f, 5, 2, 2.0, 5.0) <= 0.15f);
             int flowerValid = fbm2D(worldX / 10.f, worldZ / 10.f, 5, 2, 2.0, 5.0) > 0.37f;
             int shortGrassValid = fbm2D(worldX / 1.2f, worldZ / 10.f, 5, 2, 2.0, 5.0) > 0.30f;
             int shrubValid = fbm2D(worldX / 6.f, worldZ / 6.f, 4, 2, 2.0, 3.0) > 0.55f;
@@ -329,7 +329,7 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
 
             int trunkHeight = 10 + (int)(fbm2D(worldX, worldZ, 1, 1, 1, 1) * 5); // 10-14 tall trunk
 
-            for (int yAdd = 0; yAdd < trunkHeight; yAdd++)
+            for (int yAdd = 0; yAdd < trunkHeight-5; yAdd++)
             {
                 int newY = surfaceY + yAdd;
                 if (newY >= ChunkHeightY)
@@ -342,7 +342,7 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
 
             // Christmas-tree canopy: stack of tapering rings from a wide base
             // near the bottom of the trunk up to a single point at the top.
-            int canopyBaseY = surfaceY + 2;                 // leave a bit of bare trunk near the ground
+            int canopyBaseY = surfaceY + 3;                 // leave a bit of bare trunk near the ground
             int canopyTopY  = surfaceY + trunkHeight;        // point of the tree
             int numLayers   = canopyTopY - canopyBaseY;
 
@@ -357,17 +357,30 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
                 if (layerY < 0 || layerY >= ChunkHeightY)
                     continue;
 
-                // linear taper from maxRadius at the base to 0 at the very top
                 int radius = maxRadius - (int)((float)(maxRadius) * layer / (float)(numLayers - 1) + 0.5f);
                 if (radius < 0) radius = 0;
+
+                // peek ahead: is this the last ring before the single-block tip?
+                int nextRadius = 0;
+                if (layer + 1 < numLayers)
+                {
+                    nextRadius = maxRadius - (int)((float)(maxRadius) * (layer + 1) / (float)(numLayers - 1) + 0.5f);
+                    if (nextRadius < 0) nextRadius = 0;
+                }
+                int isTopRing = (radius > 0 && nextRadius == 0);
 
                 for (int xOff = -radius; xOff <= radius; xOff++)
                 {
                     for (int zOff = -radius; zOff <= radius; zOff++)
                     {
-                        // diamond taper so corners round off instead of staying square
                         int manhattan = abs(xOff) + abs(zOff);
                         if (manhattan > radius + 1)
+                            continue;
+
+                        int isDiagonalCorner = (manhattan == radius + 1);
+
+                        // don't place the 4 diagonal corners at all on the ring right below the tip
+                        if (isTopRing && isDiagonalCorner)
                             continue;
 
                         int newX = x + xOff, newZ = z + zOff;
@@ -384,16 +397,18 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
                         int absX = abs(xOff), absZ = abs(zOff);
                         int distFromEdge = radius - ((absX > absZ) ? absX : absZ);
 
-                        // slope any block on the outer rim, including the rounded diamond corners
-                        if (radius > 0 && (distFromEdge <= 0 || manhattan == radius + 1))
+                        if (radius > 0 && (distFromEdge <= 0 || isDiagonalCorner))
                         {
                             if (absX >= absZ)
-                                b->isSlope = (xOff > 0) ? 2 : 4; // east : west
+                                b->isSlope = (xOff > 0) ? 2 : 4;
                             else
-                                b->isSlope = (zOff > 0) ? 1 : 3; // south : north
+                                b->isSlope = (zOff > 0) ? 1 : 3;
                         }
                     }
                 }
+
+                if (radius == 0)
+                    break;
             }
         }
     }
