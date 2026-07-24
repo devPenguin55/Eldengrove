@@ -1,10 +1,14 @@
 #version 430 core
 
-in vec2 fragUV;
-flat in float fragLayer;
-in vec3 worldPos;
-flat in int fragGpuLightIndex;
-flat in int fragFace;
+in DATA
+{
+    vec2 fragUV;
+    flat float fragLayer;
+    vec3 worldPos;
+    flat int fragGpuLightIndex;
+    flat int fragFace;
+} fragIn;
+
 out vec4 fragColor;
 
 uniform sampler2DArray blockTextures;
@@ -45,14 +49,9 @@ float getLight(int x, int y, int z)
     int localX = ((x % 16) + 16) % 16;
     int localZ = ((z % 16) + 16) % 16;
 
-    int localIndex =
-        localX +
-        localZ * 16 +
-        y * 16 * 16;
+    int localIndex = localX + localZ * 16 + y * 16 * 16;
 
-    int finalIndex =
-        fragGpuLightIndex * 32768 +
-        localIndex;
+    int finalIndex = (fragIn.fragGpuLightIndex) * 32768 + localIndex;
 
 
     uint packedLightData = texelFetch(lightBuffer, finalIndex).r;
@@ -69,15 +68,15 @@ float getLight(int x, int y, int z)
 
 void main()
 {
-    int layer = int(fragLayer);
+    int layer = int(fragIn.fragLayer);
 
     vec4 texColor; 
 
     // layer < 0 is for the UI to separate it from the normal rendering
     if (layer >= 0) {
-        texColor = texture(blockTextures, vec3(fragUV, layer));
+        texColor = texture(blockTextures, vec3(fragIn.fragUV, layer));
     } else {
-        texColor = texture(blockTextures, vec3(fragUV, layer+55));
+        texColor = texture(blockTextures, vec3(fragIn.fragUV, layer+55));
     }
 
     if (layer == 4)
@@ -93,10 +92,10 @@ void main()
     if (layer < 0) {
         texColor.rgb *= 1.0;
     } else {        
-        vec3 samplePos = worldPos;
+        vec3 samplePos = fragIn.worldPos;
 
         // first adjust the vertex that is on the half-voxel coordinates to the normal voxel coordinates
-        switch (fragFace)
+        switch (fragIn.fragFace)
         {
             case FACE_TOP:
                 samplePos.y -= 0.5;
@@ -128,7 +127,7 @@ void main()
         float z = round(samplePos.z);
 
         // now sample for the neighboring block lighting to get the correct lighting for the face
-        switch (fragFace)
+        switch (fragIn.fragFace)
         {
             case FACE_TOP:
                 y += 1;
@@ -154,11 +153,11 @@ void main()
                 z += 1;
                 break;
         }
-        if (fragFace != FACE_CROSS && fragFace != FACE_SLOPE) {
+        if (fragIn.fragFace != FACE_CROSS && fragIn.fragFace != FACE_SLOPE) {
             
-            texColor.rgb *= getLight(int(floor(x)), int(floor(y)), int(floor(z))) * getFaceShade(fragFace);
+            texColor.rgb *= getLight(int(floor(x)), int(floor(y)), int(floor(z))) * getFaceShade(fragIn.fragFace);
         } else {
-            texColor.rgb *= getLight(int(round(worldPos.x)), int(round(worldPos.y)), int(round(worldPos.z))) * getFaceShade(fragFace);
+            texColor.rgb *= getLight(int(round(fragIn.worldPos.x)), int(round(fragIn.worldPos.y)), int(round(fragIn.worldPos.z))) * getFaceShade(fragIn.fragFace);
         }
 
         

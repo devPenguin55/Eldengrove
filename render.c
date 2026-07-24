@@ -252,11 +252,13 @@ void initGraphics()
 
     GLuint vs = compileShader("shader.vert", GL_VERTEX_SHADER);
     GLuint fs = compileShader("shader.frag", GL_FRAGMENT_SHADER);
+    GLuint gs = compileShader("shader.geom", GL_GEOMETRY_SHADER);
 
     worldShader = glCreateProgram();
 
     glAttachShader(worldShader, vs);
     glAttachShader(worldShader, fs);
+    glAttachShader(worldShader, gs);
 
     glBindAttribLocation(worldShader, 0, "position");
     glBindAttribLocation(worldShader, 1, "texCoord");
