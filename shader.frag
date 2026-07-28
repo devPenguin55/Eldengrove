@@ -22,6 +22,7 @@ uniform usamplerBuffer lightBuffer; // for all render chunks in one
 #define FACE_BACK 6
 #define FACE_CROSS 7 // use for things like flowers
 #define FACE_SLOPE 8 // use for slopes
+#define FACE_GRASS 9
 
 float getFaceShade(int face)
 {
@@ -39,8 +40,12 @@ float getFaceShade(int face)
             return 0.9;
         case FACE_CROSS:
             return 1.0;  // billboards read as flat art, don't want them darkened
+        case FACE_SLOPE:
+            return 0.99;
+        case FACE_GRASS:
+            return 0.95;
         default:
-            return 0.9;
+            return 1.0;
     }
 }
 
@@ -63,6 +68,10 @@ float getLight(int x, int y, int z)
     float sky = float(skyLight) / 15.0;
     float block = float(blockLight) / 15.0;
     float brightness = max(sky, block);
+
+    if (fragIn.fragFace == FACE_GRASS && brightness < 0.2) {
+        brightness == 0.5;
+    }
     return brightness;
 }
 
@@ -74,7 +83,11 @@ void main()
 
     // layer < 0 is for the UI to separate it from the normal rendering
     if (layer >= 0) {
-        texColor = texture(blockTextures, vec3(fragIn.fragUV, layer));
+        if (layer == FACE_GRASS) {
+            texColor = texture(blockTextures, vec3(fragIn.fragUV, FACE_TOP));
+        } else {
+            texColor = texture(blockTextures, vec3(fragIn.fragUV, layer));
+        }
     } else {
         texColor = texture(blockTextures, vec3(fragIn.fragUV, layer+55));
     }
@@ -116,9 +129,11 @@ void main()
             case FACE_FRONT:
                 samplePos.z += 0.5;
                 break;
-
             case FACE_BACK:
                 samplePos.z -= 0.5;
+                break;
+            case FACE_GRASS: // same as FACE_TOP
+                samplePos.y -= 0.5;
                 break;
         }
 
@@ -151,6 +166,9 @@ void main()
 
             case FACE_BACK:
                 z += 1;
+                break;
+            case FACE_GRASS: // same as FACE_TOP
+                y += 1;
                 break;
         }
         if (fragIn.fragFace != FACE_CROSS && fragIn.fragFace != FACE_SLOPE) {

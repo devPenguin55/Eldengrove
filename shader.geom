@@ -1,7 +1,9 @@
 #version 330 compatibility
 
 layout (triangles) in;
-layout (triangle_strip, max_vertices = 64) out;
+layout (triangle_strip, max_vertices = 67) out;
+
+uniform vec3 playerPosition;
 
 in DATA
 {
@@ -29,11 +31,12 @@ out DATA
 #define FACE_BACK 6
 #define FACE_CROSS 7
 #define FACE_SLOPE 8
+#define FACE_GRASS 9
 
 uniform float time;
 
 float hash(vec2 p)
-{
+{   
     return fract(
         sin(dot(p, vec2(12.9898, 78.233))) *
         43758.5453
@@ -60,20 +63,29 @@ void main()
 
     EndPrimitive();
 
-    if (!(geomIn[0].fragFace == FACE_TOP && geomIn[0].fragLayer == 1))
+    if (!((geomIn[0].fragFace == FACE_TOP || geomIn[0].fragFace == FACE_SLOPE)&& geomIn[0].fragLayer == 1))
     {
         return;
+    } else if (distance(playerPosition, geomIn[0].worldPos) > 20) {
+        return;
     }
+    
+    float playerDistance =
+    distance(playerPosition, geomIn[0].worldPos);
 
+    
     vec3 p0 = geomIn[0].worldPos;
     vec3 p1 = geomIn[1].worldPos;
     vec3 p2 = geomIn[2].worldPos;
 
+    
+
+
     vec3 edge1 = p1 - p0;
     vec3 edge2 = p2 - p0;
 
-    vec3 faceNormal =
-        normalize(cross(edge1, edge2));
+    vec3 faceNormal = vec3(0,1.0,0);
+        // normalize(cross(edge1, edge2));
 
     vec3 up =
         abs(faceNormal.y) < 0.99
@@ -84,11 +96,11 @@ void main()
         normalize(cross(faceNormal, up));
 
     // grass 
-    for (int j = 0; j < 16; j++)
+    for (int j = 0; j < 64; j++)
     {
         vec2 randomSeed =
-            p0.xz +
-            vec2(float(j) * 17.31, float(j) * 43.17);
+        p0.xz +
+        vec2(float(j) * 17.31, float(j) * 43.17);
 
         float r1 = hash(randomSeed);
         float r2 = hash(randomSeed + 13.37);
@@ -106,10 +118,12 @@ void main()
 
         float h =
             mix(
+                0.05,
                 0.15,
-                0.35,
                 hash(randomSeed + 91.7)
             );
+
+        
 
         // Random blade width
         float width =
@@ -155,11 +169,12 @@ void main()
         base += faceNormal * 0.005;
 
         vec3 verts[4] = vec3[](
-            base - bladeRight,
-            base + bladeRight,
-            tip - bladeRight * 0.25,
-            tip + bladeRight * 0.25
+            base - bladeRight * 3,
+            base + bladeRight * 3,
+            tip - bladeRight * 0.75,
+            tip + bladeRight * 0.75
         );
+
 
         for (int i = 0; i < 4; i++)
         {
@@ -167,13 +182,13 @@ void main()
                 gl_ModelViewProjectionMatrix *
                 vec4(verts[i], 1.0);
 
-            geomOut.fragUV = vec2(1.0, 0.0);
-            geomOut.fragLayer = geomIn[0].fragLayer;
+            geomOut.fragUV = vec2(0.9,0.9);
+            geomOut.fragLayer = FACE_GRASS;
             geomOut.worldPos = verts[i];
             geomOut.fragGpuLightIndex =
                 geomIn[0].fragGpuLightIndex;
             geomOut.fragFace =
-                FACE_CROSS;
+                FACE_GRASS;
 
             EmitVertex();
         }

@@ -6,6 +6,8 @@ layout(location = 2) in float layer;
 layout(location = 3) in int gpuLightIndex;
 layout(location = 4) in int face;
 
+uniform vec3 playerPosition;
+
 out DATA
 {
     vec2 fragUV;

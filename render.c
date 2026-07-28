@@ -43,6 +43,7 @@ GLuint lightBuffer;
 GLuint lightTex;
 uint8_t *allChunkLighting;
 
+GLuint gs;
 
 int hotbarBlocks[9];
 int hotbarActiveSlot = -1;
@@ -252,7 +253,7 @@ void initGraphics()
 
     GLuint vs = compileShader("shader.vert", GL_VERTEX_SHADER);
     GLuint fs = compileShader("shader.frag", GL_FRAGMENT_SHADER);
-    GLuint gs = compileShader("shader.geom", GL_GEOMETRY_SHADER);
+    gs = compileShader("shader.geom", GL_GEOMETRY_SHADER);
 
     worldShader = glCreateProgram();
 
@@ -300,7 +301,7 @@ void initGraphics()
 
     const char *blockTextures[] = {
         "assets\\grassSide.png",   // 0
-        "assets\\grassTop.png",    // 1
+        "assets\\grassTop2.png",    // 1
         "assets\\dirt.png",        // 2
         "assets\\stone.png",       // 3
         "assets\\water.png",       // 4
@@ -1072,7 +1073,7 @@ void buildWorldMesh()
                 }
                 else
                 {
-                    if ((worldVertexCount + 6) > worldVertexCapacity)
+                    if ((worldVertexCount + 24) > worldVertexCapacity)
                     {
                         worldVertexCapacity = worldVertexCapacity * 2 + 1024;
                         worldVertices = realloc(worldVertices, sizeof(Vertex) * worldVertexCapacity);
@@ -1404,7 +1405,7 @@ void buildWorldMesh()
                 }
                 else
                 {
-                    if (waterVertexCount + 6 > waterVertexCapacity)
+                    if (waterVertexCount + 24 > waterVertexCapacity)
                     {
                         waterVertexCapacity = waterVertexCapacity * 2 + 1024;
                         waterVertices = realloc(waterVertices, sizeof(Vertex) * waterVertexCapacity);
@@ -1771,7 +1772,7 @@ void drawGraphics()
 
     buildWorldMesh(); // fills worldVertices and worldVertexCount
 
-    
+    // printf("%f %f %f\n", player.position.x, player.position.y, player.position.z);
     glUseProgram(worldShader);
 
     glActiveTexture(GL_TEXTURE0);
@@ -1787,9 +1788,27 @@ void drawGraphics()
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_BUFFER, lightTex);
     glUniform1i(glGetUniformLocation(worldShader, "lightBuffer"), 1);
-
+    GLint playerPositionLocation = glGetUniformLocation(worldShader, "playerPosition");
+    glUniform3fv(playerPositionLocation, 1, &player.position.x);
+    GLint timeLocation = glGetUniformLocation(worldShader, "time");
+    glUniform1f(timeLocation, currentTime);
 
     glBindVertexArray(worldVAO);
+    // for (int i = 0; i < chunkLoaderManager.renderChunks.amtRenderChunks; i++) {
+    //     Chunk *chunk = chunkLoaderManager.renderChunks.renderChunks[i];
+    //     // if (!chunk->hasVertices || chunk->firstVertex == -1 || chunk->lastVertex == -1) {
+    //     //     printf(
+    //     //         "Chunk %d: first=%d last=%d count=%d\n",
+    //     //         i,
+    //     //         chunk->firstVertex,
+    //     //         chunk->lastVertex,
+    //     //         chunk->lastVertex - chunk->firstVertex + 1
+    //     //     );
+    //     //     continue;
+    //     // }
+    //     glDrawArrays(GL_TRIANGLES, chunk->firstVertex, chunk->lastVertex - chunk->firstVertex + 1);
+    // }
+
     glDrawArrays(GL_TRIANGLES, 0, worldVertexCount);
     glBindVertexArray(0);
 
@@ -1801,8 +1820,21 @@ void drawGraphics()
     glDepthFunc(GL_LEQUAL);
 
     glDisable(GL_CULL_FACE);
+
+
     glBindVertexArray(waterVAO);
+    // for (int i = 0; i < chunkLoaderManager.renderChunks.amtRenderChunks; i++)
+    // {
+    //     Chunk *c = chunkLoaderManager.renderChunks.renderChunks[i];
+    //     if (!c->hasWaterVertices || c->firstWaterVertex == -1 || c->lastWaterVertex == -1)
+    //         continue;
+    //     // if (!chunkInFrustum(c, frustumPlanes))
+    //     //     continue;
+
+    //     glDrawArrays(GL_TRIANGLES, c->firstWaterVertex, c->lastWaterVertex - c->firstWaterVertex + 1);
+    // }
     glDrawArrays(GL_TRIANGLES, 0, waterVertexCount);
+
     glBindVertexArray(0);
     glEnable(GL_CULL_FACE);
 

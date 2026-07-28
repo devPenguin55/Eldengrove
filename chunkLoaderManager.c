@@ -474,7 +474,7 @@ void loadChunks(GLfloat playerCoords[2])
                     }
                     else
                     {
-                        if ((worldVertexCount + 6) > worldVertexCapacity)
+                        if ((worldVertexCount + 24) > worldVertexCapacity)
                         {
                             worldVertexCapacity = worldVertexCapacity * 2 + 1024;
                             worldVertices = realloc(worldVertices, sizeof(Vertex) * worldVertexCapacity);
@@ -794,7 +794,7 @@ void loadChunks(GLfloat playerCoords[2])
                     }
                     else
                     {
-                        if (waterVertexCount + 6 > waterVertexCapacity)
+                        if (waterVertexCount + 24 > waterVertexCapacity)
                         {
                             waterVertexCapacity = waterVertexCapacity * 2 + 1024;
                             waterVertices = realloc(waterVertices, sizeof(Vertex) * waterVertexCapacity);
