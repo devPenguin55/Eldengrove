@@ -64,10 +64,7 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
     static int heightMap[ChunkWidthX * ChunkLengthZ];
     static int blurTmp[ChunkWidthX * ChunkLengthZ];
 
-    // ---- PASS 1: height -- low-amplitude, long-wavelength so adjacent
-    // columns differ by ~0-1 blocks most of the time (slope-friendly),
-    // with an occasional bigger hill from the ridge layer and a plains
-    // mask that flattens some regions out entirely ----
+
     for (int x = 0; x < ChunkWidthX; x++)
     {
         for (int z = 0; z < ChunkLengthZ; z++)
@@ -75,16 +72,14 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
             float worldX = BlockWidthX * x + xAdd;
             float worldZ = BlockLengthZ * z + zAdd;
 
-            // rolling hills -- long wavelength (scale 90), modest amplitude
+            // rolling hills
             float rolling = fbm2D(worldX / 90.0f, worldZ / 90.0f, 4, 2, 2.0, 5.0);
 
-            // occasional bigger hills/mountains -- even longer wavelength so
-            // its per-block gradient stays gentle despite bigger total height
+            // occasional bigger hills/mountains 
             float bigHills = ridgedFbm2D(worldX / 60.0f, worldZ / 60.0f, 5, 3, 2.0, 0.5);
 
-            // plains mask: 0 = flatten this region into a plain, 1 = let hills through
             float plainsMask = fbm2D(worldX / 320.0f, worldZ / 320.0f, 3, 2, 2.0, 3.0);
-            plainsMask = clamp((plainsMask + 1.0f) * 0.5f, 0.15f, 1.0f); // keep a floor so plains aren't perfectly flat
+            plainsMask = clamp((plainsMask + 1.0f) * 0.5f, 0.15f, 1.0f); 
 
             int h = 34;
             h += (int)(rolling * 50.0f * plainsMask);
@@ -94,8 +89,6 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
         }
     }
 
-    // ---- PASS 2: two blur passes -- mops up whatever per-column jumps
-    // the noise still produced, so slope-eligible (diff == 1) edges dominate ----
     for (int x = 0; x < ChunkWidthX; x++)
         for (int z = 0; z < ChunkLengthZ; z++)
             blurTmp[x + z * ChunkWidthX] = rawHeightMap[x + z * ChunkWidthX];
@@ -126,7 +119,6 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
             blurTmp[i] = heightMap[i];
     }
 
-    // ---- PASS 3: fill blocks, with widened cave band tuned for overhangs ----
     for (int x = 0; x < ChunkWidthX; x++)
     {
         for (int z = 0; z < ChunkLengthZ; z++)
@@ -157,8 +149,6 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
                         float base = perlinNoise3D(worldX / 22.0f, (y + yboost) / 22.0f, worldZ / 22.0f, 3);
                         float ridged = 1.0f - fabs(base);
 
-                        // region mask so caves cluster instead of appearing uniformly
-                        // everywhere -- some areas get big cave networks, others none
                         float caveRegion = fbm2D(worldX / 60.0f, worldZ / 60.0f, 3, 2, 2.0, 3.0);
 
                         if (caveRegion > 0.05f)
@@ -208,8 +198,6 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
         }
     }
 
-    // ---- PASS 4: slope-direction pass -- corner cases now PICK a direction
-    // instead of falling back to a cube step, so slope coverage dominates ----
     for (int x = 1; x < ChunkWidthX - 1; x++)
     {
         for (int z = 1; z < ChunkLengthZ - 1; z++)
@@ -230,7 +218,7 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
             else if (hWest  == h - 1) dir = 4;
 
             if (dir == 0)
-                continue; // flat or a >1 cliff -- stays a plain cube, that's fine
+                continue; 
 
             Block *b = &(chunk->blocks[x + ChunkWidthX * z + (ChunkWidthX * ChunkLengthZ) * h]);
             if (b->isAir || b->blockType == BLOCK_TYPE_WATER || b->blockType == -1)
@@ -240,7 +228,6 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
         }
     }
 
-    // ---- PASS 5: vegetation -- trees, flowers, short grass, shrubs (unchanged logic) ----
     for (int x = 0; x < ChunkWidthX; x++)
     {
         for (int z = 0; z < ChunkLengthZ; z++)
@@ -293,41 +280,10 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
                 continue;
             }
 
-            // if (shrubValid && !treeValid)
-            // {
-            //     for (int yOff = 0; yOff < 2; yOff++)
-            //     {
-            //         int layerY = surfaceY + yOff;
-            //         if (layerY < 0 || layerY >= ChunkHeightY)
-            //             continue;
-
-            //         for (int xOff = -1; xOff <= 1; xOff++)
-            //         {
-            //             for (int zOff = -1; zOff <= 1; zOff++)
-            //             {
-            //                 if (xOff != 0 && zOff != 0 && yOff == 1)
-            //                     continue;
-
-            //                 int newX = x + xOff, newZ = z + zOff;
-            //                 if (newX < 0 || newX >= ChunkWidthX || newZ < 0 || newZ >= ChunkLengthZ)
-            //                     continue;
-
-            //                 Block *b = &(chunk->blocks[newX + ChunkWidthX * newZ + (ChunkWidthX * ChunkLengthZ) * layerY]);
-            //                 if (!b->isAir)
-            //                     continue;
-
-            //                 b->blockType = BLOCK_TYPE_LEAVES;
-            //                 b->isAir = 0;
-            //             }
-            //         }
-            //     }
-            //     continue;
-            // }
-
             if (!treeValid)
             continue;
 
-            int trunkHeight = 10 + (int)(fbm2D(worldX, worldZ, 1, 1, 1, 1) * 5); // 10-14 tall trunk
+            int trunkHeight = 10 + (int)(fbm2D(worldX, worldZ, 1, 1, 1, 1) * 5);
 
             for (int yAdd = 0; yAdd < trunkHeight-5; yAdd++)
             {
@@ -340,10 +296,8 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
                 b->isAir = 0;
             }
 
-            // Christmas-tree canopy: stack of tapering rings from a wide base
-            // near the bottom of the trunk up to a single point at the top.
-            int canopyBaseY = surfaceY + 3;                 // leave a bit of bare trunk near the ground
-            int canopyTopY  = surfaceY + trunkHeight;        // point of the tree
+            int canopyBaseY = surfaceY + 3;               
+            int canopyTopY  = surfaceY + trunkHeight;
             int numLayers   = canopyTopY - canopyBaseY;
 
             if (numLayers < 3)
@@ -360,7 +314,6 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
                 int radius = maxRadius - (int)((float)(maxRadius) * layer / (float)(numLayers - 1) + 0.5f);
                 if (radius < 0) radius = 0;
 
-                // peek ahead: is this the last ring before the single-block tip?
                 int nextRadius = 0;
                 if (layer + 1 < numLayers)
                 {
@@ -379,7 +332,6 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
 
                         int isDiagonalCorner = (manhattan == radius + 1);
 
-                        // don't place the 4 diagonal corners at all on the ring right below the tip
                         if (isTopRing && isDiagonalCorner)
                             continue;
 

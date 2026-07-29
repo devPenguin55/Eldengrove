@@ -7,6 +7,10 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
 
+#include <assimp/cimport.h>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
+
 #include "render.h"
 #include "input.h"
 #include "chunks.h"
@@ -31,6 +35,9 @@ GLuint worldVAO = 0;
 GLuint waterVBO = 0;
 GLuint waterVAO = 0;
 
+GLuint modelVBO = 0;
+GLuint modelVAO = 0;
+
 Vertex *worldVertices = NULL;
 int worldVertexCount = 0;
 int worldVertexCapacity = 0;
@@ -47,6 +54,9 @@ GLuint gs;
 
 int hotbarBlocks[9];
 int hotbarActiveSlot = -1;
+
+
+const struct aiScene *scene;
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MIN4(a, b, c, d) (MIN(MIN(a, b), MIN(c, d)))
@@ -450,6 +460,8 @@ void initGraphics()
 
     blockTextureArray = loadTextureArray(blockTextures, sizeof(blockTextures) / sizeof(blockTextures[0]));
 
+
+    scene = aiImportFile("assets/catStatue/catStatue.blend", aiProcess_Triangulate |  aiProcess_JoinIdenticalVertices  |  aiProcess_CalcTangentSpace);
 }
 
 void createWorldLightingDataFromAllChunks()
