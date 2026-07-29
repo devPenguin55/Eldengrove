@@ -301,7 +301,7 @@ void initGraphics()
 
     const char *blockTextures[] = {
         "assets\\grassSide.png",   // 0
-        "assets\\grassTop2.png",    // 1
+        "assets\\grassTop.png",    // 1
         "assets\\dirt.png",        // 2
         "assets\\stone.png",       // 3
         "assets\\water.png",       // 4

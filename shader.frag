@@ -69,9 +69,10 @@ float getLight(int x, int y, int z)
     float block = float(blockLight) / 15.0;
     float brightness = max(sky, block);
 
-    if (fragIn.fragFace == FACE_GRASS && brightness < 0.2) {
-        brightness == 0.5;
+    if (fragIn.fragFace == FACE_GRASS && brightness == 0.0) {
+        return 0.9;
     }
+
     return brightness;
 }
 
