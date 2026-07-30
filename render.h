@@ -35,6 +35,38 @@ typedef struct Vertex
     int face;
 } Vertex;
 
+typedef struct ModelVertex {
+    float position[3];
+    float normal[3];
+    float texCoord[2];
+    float layer;
+} ModelVertex;
+
+typedef struct ModelInstance {
+    float position[3];
+    float rotation[3];
+    float scale;
+} ModelInstance;
+
+typedef struct Model {
+    GLuint vao;
+    GLuint vbo;
+    GLuint ebo;
+    GLuint instanceVBO;
+    GLuint textureArray;
+    unsigned int indexCount;
+    
+    ModelInstance *instances;
+    unsigned int instanceCount;
+    unsigned int instanceCapacity;
+} Model;
+
+typedef struct ModelManager {
+    int amtModels;
+    int  capacity;
+    Model *models;
+} ModelManager;
+
 extern GLfloat T;
 extern GLfloat PlayerDirX;
 extern GLfloat PlayerDirY;
@@ -51,6 +83,7 @@ extern int waterVertexCapacity;
 extern int hotbarBlocks[9];
 extern int hotbarActiveSlot;
 extern uint8_t *allChunkLighting;
+extern ModelManager modelManager;
 
 void initGraphics();
 void createWorldLightingDataFromAllChunks();

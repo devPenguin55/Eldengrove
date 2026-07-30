@@ -35,9 +35,6 @@ GLuint worldVAO = 0;
 GLuint waterVBO = 0;
 GLuint waterVAO = 0;
 
-GLuint modelVBO = 0;
-GLuint modelVAO = 0;
-
 Vertex *worldVertices = NULL;
 int worldVertexCount = 0;
 int worldVertexCapacity = 0;
@@ -50,13 +47,18 @@ GLuint lightBuffer;
 GLuint lightTex;
 uint8_t *allChunkLighting;
 
+GLuint worldShader;
 GLuint gs;
+
+GLuint modelShader;
+
+ModelManager modelManager;
 
 int hotbarBlocks[9];
 int hotbarActiveSlot = -1;
 
 
-const struct aiScene *scene;
+const struct aiScene *assimpScene;
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MIN4(a, b, c, d) (MIN(MIN(a, b), MIN(c, d)))
@@ -72,7 +74,6 @@ static inline float clamp(float value, float minVal, float maxVal)
     return value;
 }
 
-GLuint worldShader;
 char *loadFile(const char *path)
 {
     FILE *file = fopen(path, "rb");
@@ -161,6 +162,10 @@ GLuint loadTextureArray(const char *filenames[], int count)
     if (!data)
     {
         printf("Failed to load texture %s\n", filenames[0]);
+        printf(
+            "STB error: %s\n",
+            stbi_failure_reason()
+        );
         return 0;
     }
 
@@ -180,6 +185,10 @@ GLuint loadTextureArray(const char *filenames[], int count)
         if (!layerData)
         {
             printf("Failed to load %s\n", filenames[i]);
+            printf(
+                "STB error: %s\n",
+                stbi_failure_reason()
+            );
             continue;
         }
         glTexSubImage3D(GL_TEXTURE_2D_ARRAY, 0, 0, 0, i, width, height, 1, format, GL_UNSIGNED_BYTE, layerData);
@@ -229,6 +238,353 @@ float getWaterScreenY(int windowHeight)
     return waterY;
 }
 
+int initModel(const char *objPath) { 
+    if (modelManager.amtModels >= modelManager.capacity) {
+        modelManager.capacity *= 2;
+        modelManager.models = realloc(modelManager.models, sizeof(Model) * modelManager.capacity);
+    }
+    Model *currentModel = &(modelManager.models[modelManager.amtModels]);
+    int currentModelIndex = modelManager.amtModels;
+
+    assimpScene = aiImportFile(objPath, aiProcess_Triangulate |  aiProcess_JoinIdenticalVertices  |  aiProcess_CalcTangentSpace | aiProcess_FlipUVs);
+
+
+    if (assimpScene == NULL) {
+        printf("Failed to import model: %s\n", aiGetErrorString());
+        return -1;
+    }
+     
+    if (assimpScene->mNumMaterials == 0) {
+        printf("No materials detected\n");
+        return -1;
+    }
+
+    modelManager.amtModels++;
+
+    currentModel->instanceCount = 0;
+    currentModel->instanceCapacity = 16;
+    currentModel->instances = malloc(sizeof(ModelInstance) * currentModel->instanceCapacity);
+    
+    char texturePaths[assimpScene->mNumMaterials][1024];
+    const char *modelTextures[assimpScene->mNumMaterials];
+    int materialIndexToTextureMap[assimpScene->mNumMaterials];
+    memset(texturePaths, 0, sizeof(texturePaths));
+    memset(modelTextures, 0, sizeof(modelTextures));
+
+    int existingMaterialIndex = 0;
+    for (int materialIndex = 0; materialIndex < assimpScene->mNumMaterials; materialIndex++) {
+        const struct aiMaterial *material = assimpScene->mMaterials[materialIndex];
+        
+        struct aiString texturePath;
+
+        if (aiGetMaterialTexture(
+                material,
+                aiTextureType_DIFFUSE,
+                0,
+                &texturePath,
+                NULL,
+                NULL,
+                NULL,
+                NULL,
+                NULL,
+                NULL
+            ) == AI_SUCCESS) {
+
+                
+   
+            snprintf(
+                texturePaths[existingMaterialIndex],
+                sizeof(texturePaths[existingMaterialIndex]),
+                "assets/OBJ/%s",
+                texturePath.data
+            );
+
+            modelTextures[existingMaterialIndex] =
+                texturePaths[existingMaterialIndex];
+
+            printf(
+                "Texture path: %d %s\n",
+                existingMaterialIndex,
+                modelTextures[existingMaterialIndex]
+            );
+
+            materialIndexToTextureMap[materialIndex] = existingMaterialIndex;
+            existingMaterialIndex++;
+        } else {
+            materialIndexToTextureMap[materialIndex] = -1;
+        }
+    }
+    
+
+    currentModel->textureArray = loadTextureArray(modelTextures, existingMaterialIndex);
+
+    int totalModelVertices = 0;
+    unsigned int totalModelFaces = 0;
+    for (int meshNumber = 0; meshNumber < assimpScene->mNumMeshes; meshNumber++) {
+        totalModelVertices += assimpScene->mMeshes[meshNumber]->mNumVertices;
+        totalModelFaces += assimpScene->mMeshes[meshNumber]->mNumFaces;        
+    }
+    
+    ModelVertex *modelVertices = malloc(sizeof(ModelVertex) * totalModelVertices);
+    currentModel->indexCount = totalModelFaces * 3;
+
+    
+    unsigned int* modelIndices = malloc(
+        currentModel->indexCount * sizeof(unsigned int)
+    );
+
+    unsigned int currentVertexNumber = 0;
+    unsigned int curIndicesIndex = 0;
+    for (int meshNumber = 0; meshNumber < assimpScene->mNumMeshes; meshNumber++) {
+        const struct aiMesh *mesh = assimpScene->mMeshes[meshNumber];
+        for (int i = 0; i < mesh->mNumVertices; i++) {
+            modelVertices[i+currentVertexNumber].position[0] = mesh->mVertices[i].x;
+            modelVertices[i+currentVertexNumber].position[1] = mesh->mVertices[i].y;
+            modelVertices[i+currentVertexNumber].position[2] = mesh->mVertices[i].z;
+
+            modelVertices[i+currentVertexNumber].normal[0] = mesh->mNormals[i].x;
+            modelVertices[i+currentVertexNumber].normal[1] = mesh->mNormals[i].y;
+            modelVertices[i+currentVertexNumber].normal[2] = mesh->mNormals[i].z;
+
+            if (mesh->mTextureCoords[0]) {
+                modelVertices[i+currentVertexNumber].texCoord[0] = mesh->mTextureCoords[0][i].x;
+                modelVertices[i+currentVertexNumber].texCoord[1] = mesh->mTextureCoords[0][i].y;
+            } else {
+                modelVertices[i+currentVertexNumber].texCoord[0] = 0.0f;
+                modelVertices[i+currentVertexNumber].texCoord[1] = 0.0f;
+            }
+
+            modelVertices[i+currentVertexNumber].layer = (float)materialIndexToTextureMap[mesh->mMaterialIndex];
+        }
+
+        
+        
+        for (unsigned int i = 0; i < mesh->mNumFaces; i++) {
+            const struct aiFace* face = &mesh->mFaces[i];
+            modelIndices[curIndicesIndex++] = face->mIndices[0] + currentVertexNumber;
+            modelIndices[curIndicesIndex++] = face->mIndices[1] + currentVertexNumber;
+            modelIndices[curIndicesIndex++] = face->mIndices[2] + currentVertexNumber;
+        }
+
+        currentVertexNumber += mesh->mNumVertices;
+    }
+
+
+    glGenVertexArrays(1, &currentModel->vao);
+    glGenBuffers(1, &currentModel->vbo);
+    glGenBuffers(1, &currentModel->ebo);
+    glGenBuffers(1, &currentModel->instanceVBO);
+
+    glBindVertexArray(currentModel->vao);
+
+    glBindBuffer(GL_ARRAY_BUFFER, currentModel->vbo);
+
+    glBufferData(
+        GL_ARRAY_BUFFER,
+        totalModelVertices * sizeof(ModelVertex),
+        modelVertices,
+        GL_STATIC_DRAW
+    );
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, currentModel->ebo);
+
+    glBufferData(
+        GL_ELEMENT_ARRAY_BUFFER,
+        currentModel->indexCount * sizeof(unsigned int),
+        modelIndices,
+        GL_STATIC_DRAW
+    );
+
+    glVertexAttribPointer(
+        0,
+        3,
+        GL_FLOAT,
+        GL_FALSE,
+        sizeof(ModelVertex),
+        (void*)offsetof(ModelVertex, position)
+    );
+    glEnableVertexAttribArray(0);
+
+    glVertexAttribPointer(
+        1,
+        3,
+        GL_FLOAT,
+        GL_FALSE,
+        sizeof(ModelVertex),
+        (void*)offsetof(ModelVertex, normal)
+    );
+    glEnableVertexAttribArray(1);
+
+    glVertexAttribPointer(
+        2,
+        2,
+        GL_FLOAT,
+        GL_FALSE,
+        sizeof(ModelVertex),
+        (void*)offsetof(ModelVertex, texCoord)
+    );
+    glEnableVertexAttribArray(2);
+
+    glVertexAttribPointer(
+        3,
+        1,
+        GL_FLOAT,
+        GL_FALSE,
+        sizeof(ModelVertex),
+        (void*)offsetof(ModelVertex, layer)
+    );
+    glEnableVertexAttribArray(3);
+
+    glBindBuffer(GL_ARRAY_BUFFER, currentModel->instanceVBO);
+
+    glBufferData(
+        GL_ARRAY_BUFFER,
+        sizeof(ModelInstance) * currentModel->instanceCapacity,
+        NULL,
+        GL_DYNAMIC_DRAW
+    );
+
+    glVertexAttribPointer(
+        4,
+        3,
+        GL_FLOAT,
+        GL_FALSE,
+        sizeof(ModelInstance),
+        (void*)offsetof(ModelInstance, position)
+    );
+    glEnableVertexAttribArray(4);
+    glVertexAttribDivisor(4, 1);
+
+    glVertexAttribPointer(
+        5,
+        3,
+        GL_FLOAT,
+        GL_FALSE,
+        sizeof(ModelInstance),
+        (void*)offsetof(ModelInstance, rotation)
+    );
+    glEnableVertexAttribArray(5);
+    glVertexAttribDivisor(5, 1);
+
+    glVertexAttribPointer(
+        6,
+        1,
+        GL_FLOAT,
+        GL_FALSE,
+        sizeof(ModelInstance),
+        (void*)offsetof(ModelInstance, scale)
+    );
+    glEnableVertexAttribArray(6);
+    glVertexAttribDivisor(6, 1);
+
+    glBindVertexArray(0);  
+
+
+    
+
+    free(modelVertices);
+    free(modelIndices);
+    aiReleaseImport(assimpScene);
+    assimpScene = NULL;
+
+    return currentModelIndex;
+}
+
+void createModelInstance(Model *model, Vec3 *position, Vec3 *rotation, float scale) {
+    if (model->instanceCount >= model->instanceCapacity) {
+        model->instanceCapacity *= 2;
+        model->instances = realloc(model->instances, sizeof(ModelInstance) * model->instanceCapacity);
+
+        glBindBuffer(GL_ARRAY_BUFFER, model->instanceVBO);
+
+        glBufferData(
+            GL_ARRAY_BUFFER,
+            sizeof(ModelInstance) * model->instanceCapacity,
+            model->instances,
+            GL_DYNAMIC_DRAW
+        );
+    }
+
+    unsigned int instanceIndex = model->instanceCount++;
+
+    model->instances[instanceIndex].position[0] = position->x;
+    model->instances[instanceIndex].position[1] = position->y;
+    model->instances[instanceIndex].position[2] = position->z;
+
+    model->instances[instanceIndex].rotation[0] = rotation->x;
+    model->instances[instanceIndex].rotation[1] = rotation->y;
+    model->instances[instanceIndex].rotation[2] = rotation->z;
+
+    model->instances[instanceIndex].scale = scale;
+
+    glBindBuffer(GL_ARRAY_BUFFER, model->instanceVBO);
+
+    glBufferSubData(
+        GL_ARRAY_BUFFER,
+        instanceIndex * sizeof(ModelInstance),
+        sizeof(ModelInstance),
+        &model->instances[instanceIndex]
+    );
+}
+
+void updateModelInstance(Model *model, int instanceIndex, Vec3 *newPosition, Vec3 *newRotation, float newScale) {
+    if (instanceIndex < 0 ||
+        instanceIndex >= model->instanceCount) {
+        printf("Invalid model instance index: %d\n", instanceIndex);
+        return;
+    }
+
+    model->instances[instanceIndex].position[0] = newPosition->x;
+    model->instances[instanceIndex].position[1] = newPosition->y;
+    model->instances[instanceIndex].position[2] = newPosition->z;
+
+    model->instances[instanceIndex].rotation[0] = newRotation->x;
+    model->instances[instanceIndex].rotation[1] = newRotation->y;
+    model->instances[instanceIndex].rotation[2] = newRotation->z;
+
+    model->instances[instanceIndex].scale = newScale;
+
+    glBindBuffer(GL_ARRAY_BUFFER, model->instanceVBO);
+
+    glBufferSubData(
+        GL_ARRAY_BUFFER,
+        instanceIndex * sizeof(ModelInstance),
+        sizeof(ModelInstance),
+        &model->instances[instanceIndex]
+    );
+}
+
+void initModelManager() {
+    modelManager.amtModels = 0;
+    modelManager.capacity = 2;
+    modelManager.models = malloc(sizeof(Model) * modelManager.capacity);
+
+    modelShader = glCreateProgram();
+
+    GLuint modelVS = compileShader("modelShader.vert", GL_VERTEX_SHADER);
+    GLuint modelFS = compileShader("modelShader.frag", GL_FRAGMENT_SHADER);
+    glAttachShader(modelShader, modelVS);
+    glAttachShader(modelShader, modelFS);
+
+    glBindAttribLocation(modelShader, 0, "position");
+    glBindAttribLocation(modelShader, 1, "normal");
+    glBindAttribLocation(modelShader, 2, "texCoord");
+    glBindAttribLocation(modelShader, 3, "layer"); // texture index
+    glBindAttribLocation(modelShader, 4, "instancePosition");
+    glBindAttribLocation(modelShader, 5, "instanceRotation");
+    glBindAttribLocation(modelShader, 6, "instanceScale");
+    glLinkProgram(modelShader);
+
+    int treeModelIndex = initModel("assets/OBJ/CommonTree_1.obj");
+    int mushroomModelIndex = initModel("assets/OBJ/Mushroom_Common.obj");
+
+    createModelInstance(&modelManager.models[treeModelIndex], &(Vec3){33.0f, 60.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, 1.0f);
+    createModelInstance(&modelManager.models[treeModelIndex], &(Vec3){27.0f, 60.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, 1.0f);
+    createModelInstance(&modelManager.models[mushroomModelIndex], &(Vec3){39.0f, 60.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, 1.0f);
+}
+
+
+
 void initGraphics()
 {
     glClearColor(0, 0, 0, 1);
@@ -238,15 +594,15 @@ void initGraphics()
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
 
-    destroyStageTextureArray[0] = loadTexture("assets\\destroy_stage_0.png");
-    destroyStageTextureArray[1] = loadTexture("assets\\destroy_stage_1.png");
-    destroyStageTextureArray[2] = loadTexture("assets\\destroy_stage_2.png");
-    destroyStageTextureArray[3] = loadTexture("assets\\destroy_stage_3.png");
-    destroyStageTextureArray[4] = loadTexture("assets\\destroy_stage_4.png");
-    destroyStageTextureArray[5] = loadTexture("assets\\destroy_stage_5.png");
-    destroyStageTextureArray[6] = loadTexture("assets\\destroy_stage_6.png");
-    destroyStageTextureArray[7] = loadTexture("assets\\destroy_stage_7.png");
-    destroyStageTextureArray[8] = loadTexture("assets\\destroy_stage_8.png");
+    destroyStageTextureArray[0] = loadTexture("assets/destroy_stage_0.png");
+    destroyStageTextureArray[1] = loadTexture("assets/destroy_stage_1.png");
+    destroyStageTextureArray[2] = loadTexture("assets/destroy_stage_2.png");
+    destroyStageTextureArray[3] = loadTexture("assets/destroy_stage_3.png");
+    destroyStageTextureArray[4] = loadTexture("assets/destroy_stage_4.png");
+    destroyStageTextureArray[5] = loadTexture("assets/destroy_stage_5.png");
+    destroyStageTextureArray[6] = loadTexture("assets/destroy_stage_6.png");
+    destroyStageTextureArray[7] = loadTexture("assets/destroy_stage_7.png");
+    destroyStageTextureArray[8] = loadTexture("assets/destroy_stage_8.png");
     glEnable(GL_TEXTURE_2D);
 
     selectedBlockToRender.active = 0;
@@ -310,18 +666,18 @@ void initGraphics()
 
 
     const char *blockTextures[] = {
-        "assets\\grassSide.png",   // 0
-        "assets\\grassTop.png",    // 1
-        "assets\\dirt.png",        // 2
-        "assets\\stone.png",       // 3
-        "assets\\water.png",       // 4
-        "assets\\red_clay.png",    // 5
-        "assets\\oak_log.png",     // 6
-        "assets\\oak_log_top.png", // 7
-        "assets\\leaves.png",      // 8
-        "assets\\blue_orchid.png", // 9
-        "assets\\short_grass.png", // 10
-        "assets\\torch.png"        // 11
+        "assets/grassSide.png",   // 0
+        "assets/grassTop.png",    // 1
+        "assets/dirt.png",        // 2
+        "assets/stone.png",       // 3
+        "assets/water.png",       // 4
+        "assets/red_clay.png",    // 5
+        "assets/oak_log.png",     // 6
+        "assets/oak_log_top.png", // 7
+        "assets/leaves.png",      // 8
+        "assets/blue_orchid.png", // 9
+        "assets/short_grass.png", // 10
+        "assets/torch.png"        // 11
     };
 
     int GRASS_SIDE_TEXTURE_ARRAY_INDEX = 0;
@@ -457,13 +813,13 @@ void initGraphics()
         .lightEmissivePower = 15
     };
 
-
     blockTextureArray = loadTextureArray(blockTextures, sizeof(blockTextures) / sizeof(blockTextures[0]));
 
 
-    scene = aiImportFile("assets/catStatue/catStatue.blend", aiProcess_Triangulate |  aiProcess_JoinIdenticalVertices  |  aiProcess_CalcTangentSpace);
+    
+    initModelManager();
 }
-
+ 
 void createWorldLightingDataFromAllChunks()
 {
     RenderChunks *renderChunks = &(chunkLoaderManager.renderChunks);
@@ -523,16 +879,6 @@ void uploadLighting() {
         totalSize,
         allChunkLighting
     );
-
-
-    // if (chunkLoaderManager.loadedChunks.amtLoadedChunks == 168) {
-
-    //     int chunkBase = 5 * chunkVoxelCount;
-    //     for (int i = 0; i < chunkVoxelCount; i++) {
-    //         printf("%d ", GET_SKYLIGHT(allChunkLighting[chunkBase + i]));
-    //     }
-    //     printf("\n");
-    // }
 }
 
 void reshape(int width, int height)
@@ -563,16 +909,7 @@ void spinObject()
     glutPostRedisplay();
 }
 
-void adjustVerticesForQuadData(
-    Vertex *v0,
-    Vertex *v1,
-    Vertex *v2,
-    Vertex *v3,
-    float x,
-    float y,
-    float z,
-    int face
-)
+void adjustVerticesForQuadData(Vertex *v0, Vertex *v1, Vertex *v2, Vertex *v3, float x, float y, float z, int face)
 {
     Vertex *verts[4] = {v0, v1, v2, v3};
 
@@ -630,14 +967,7 @@ void adjustVerticesForQuadData(
     }
 }
 
-void face(
-    GLfloat A[3],
-    GLfloat B[3],
-    GLfloat C[3],
-    GLfloat D[3],
-    GLfloat transformation[3],
-    GLuint texture,
-    GLfloat size[2])
+void face(GLfloat A[3], GLfloat B[3], GLfloat C[3], GLfloat D[3], GLfloat transformation[3], GLuint texture, GLfloat size[2])
 {
     GLfloat vA[3] = {A[0], A[1], A[2]};
     GLfloat vB[3] = {B[0], B[1], B[2]};
@@ -1660,6 +1990,32 @@ void uploadWorldMesh()
     glBindVertexArray(0); // unbind
 }
 
+
+void renderModel(Model *model) {
+    glUseProgram(modelShader);
+
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, model->textureArray);
+
+    glUniform1i(
+        glGetUniformLocation(modelShader, "modelTextures"),
+        0
+    );
+
+    glBindVertexArray(model->vao);
+
+    glDrawElementsInstanced(
+        GL_TRIANGLES,
+        model->indexCount,
+        GL_UNSIGNED_INT,
+        0,
+        model->instanceCount
+    );
+
+    glBindVertexArray(0);
+}
+
 void drawGraphics()
 {
     frameCount++;
@@ -1781,6 +2137,14 @@ void drawGraphics()
             glEnd();
         }
     }
+
+    for (unsigned int i = 0; i < modelManager.amtModels; i++) {
+        renderModel(&modelManager.models[i]);
+    }
+    updateModelInstance(&modelManager.models[0], 0, &(Vec3){33.0f, 60.0f, 0.0f}, &(Vec3){currentTime, 0.0f, 0.0f}, 1.0f);
+    updateModelInstance(&modelManager.models[0], 1, &(Vec3){27.0f, 60.0f, 0.0f}, &(Vec3){0.0f, currentTime, 0.0f}, 1.0f);
+    updateModelInstance(&modelManager.models[1], 0, &(Vec3){39.0f, 60.0f, 0.0f}, &(Vec3){0.0f, 0.0f, currentTime}, 1.0f);
+    
 
     buildWorldMesh(); // fills worldVertices and worldVertexCount
 
