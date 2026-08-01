@@ -58,7 +58,7 @@ int hotbarBlocks[9];
 int hotbarActiveSlot = -1;
 
 
-const struct aiScene *assimpScene;
+
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #define MIN4(a, b, c, d) (MIN(MIN(a, b), MIN(c, d)))
@@ -246,8 +246,7 @@ int initModel(const char *objPath) {
     Model *currentModel = &(modelManager.models[modelManager.amtModels]);
     int currentModelIndex = modelManager.amtModels;
 
-    assimpScene = aiImportFile(objPath, aiProcess_Triangulate |  aiProcess_JoinIdenticalVertices  |  aiProcess_CalcTangentSpace | aiProcess_FlipUVs);
-
+    const struct aiScene *assimpScene = aiImportFile(objPath, aiProcess_Triangulate |  aiProcess_JoinIdenticalVertices  |  aiProcess_CalcTangentSpace | aiProcess_FlipUVs);
 
     if (assimpScene == NULL) {
         printf("Failed to import model: %s\n", aiGetErrorString());
@@ -578,9 +577,16 @@ void initModelManager() {
     int treeModelIndex = initModel("assets/OBJ/CommonTree_1.obj");
     int mushroomModelIndex = initModel("assets/OBJ/Mushroom_Common.obj");
 
-    createModelInstance(&modelManager.models[treeModelIndex], &(Vec3){33.0f, 60.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, 1.0f);
-    createModelInstance(&modelManager.models[treeModelIndex], &(Vec3){27.0f, 60.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, 1.0f);
-    createModelInstance(&modelManager.models[mushroomModelIndex], &(Vec3){39.0f, 60.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, 1.0f);
+    // ! WARNING! dont try to make a pointer to the model, since it might not be valid after generating more instances
+    for (int i = 0; i < 100; i++)
+    {
+        createModelInstance(&modelManager.models[treeModelIndex], &(Vec3){33.0f+i*5, 60.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, 1.0f);
+    }
+    for (int i = 0; i < 100; i++)
+    {
+        createModelInstance(&modelManager.models[mushroomModelIndex], &(Vec3){27.0f-i*5, 60.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, 1.0f);
+    }
+
 }
 
 
