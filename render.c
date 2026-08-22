@@ -18,6 +18,7 @@
 #include "raycast.h"
 #include "player.h"
 #include "worldDiskStorage.h"
+#include "vectors.h"
 
 GLfloat T = 0;
 
@@ -51,6 +52,7 @@ GLuint worldShader;
 GLuint gs;
 
 GLuint modelShader;
+GLuint animatedModelShader;
 
 ModelManager modelManager;
 
@@ -489,6 +491,329 @@ int initModel(const char *objPath) {
     return currentModelIndex;
 }
 
+int getBoneId(AnimatedModel *model, const struct aiBone *bone) {
+    for (unsigned int i = 0; i < model->boneCount; i++) {
+        if (strcmp(model->bones[i].name, bone->mName.data) == 0) {
+            return i;
+        }
+    }
+
+    unsigned int newBoneId = model->boneCount;
+    model->boneCount++;
+
+    model->bones = realloc(model->bones, sizeof(Bone) * model->boneCount);
+    strcpy(model->bones[newBoneId].name, bone->mName.data);
+    model->bones[newBoneId].offsetMatrix = mat4FromAiMatrix4x4(bone->mOffsetMatrix);
+
+    return newBoneId;
+}
+
+void setVertexBoneData(AnimatedModelVertex *vertex, int boneId, float weight) {
+    for (int i = 0; i < MAX_BONE_INFLUENCE; i++) {
+        if (vertex->boneIds[i] == -1) {
+            vertex->boneIds[i] = boneId;
+            vertex->boneWeights[i] = weight;
+            return;
+        }
+    }
+
+    printf("Vertex already has %d bone influences\n", MAX_BONE_INFLUENCE);
+}
+
+GLuint createTextureArray(
+    TextureData *textureData,
+    int textureCount
+) {
+    if (textureCount == 0) {
+        return 0;
+    }
+
+    int width = textureData[0].width;
+    int height = textureData[0].height;
+
+    GLuint textureArray;
+
+    glGenTextures(1, &textureArray);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, textureArray);
+
+    glTexImage3D(
+        GL_TEXTURE_2D_ARRAY,
+        0,
+        GL_RGBA8,
+        width,
+        height,
+        textureCount,
+        0,
+        GL_RGBA,
+        GL_UNSIGNED_BYTE,
+        NULL
+    );
+
+    printf("total %d textures\n", textureCount);
+    for (int i = 0; i < textureCount; i++) {
+        glTexSubImage3D(
+            GL_TEXTURE_2D_ARRAY,
+            0,
+            0,
+            0,
+            i,
+            width,
+            height,
+            1,
+            GL_RGBA,
+            GL_UNSIGNED_BYTE,
+            textureData[i].pixels
+        );
+    }
+
+    glGenerateMipmap(GL_TEXTURE_2D_ARRAY);
+
+    glTexParameteri(
+        GL_TEXTURE_2D_ARRAY,
+        GL_TEXTURE_MIN_FILTER,
+        GL_LINEAR_MIPMAP_LINEAR
+    );
+
+    glTexParameteri(
+        GL_TEXTURE_2D_ARRAY,
+        GL_TEXTURE_MAG_FILTER,
+        GL_LINEAR
+    );
+
+    glTexParameteri(
+        GL_TEXTURE_2D_ARRAY,
+        GL_TEXTURE_WRAP_S,
+        GL_REPEAT
+    );
+
+    glTexParameteri(
+        GL_TEXTURE_2D_ARRAY,
+        GL_TEXTURE_WRAP_T,
+        GL_REPEAT
+    );
+    
+    return textureArray;
+}
+
+
+void initAnimatedModel(const char *objPath) {
+    if (modelManager.amtAnimatedModels >= modelManager.animatedModelCapacity) {
+        modelManager.animatedModelCapacity *= 2;
+        modelManager.animatedModels = realloc(modelManager.animatedModels, sizeof(AnimatedModel) * modelManager.animatedModelCapacity);
+    }
+    AnimatedModel *currentModel = &(modelManager.animatedModels[modelManager.amtAnimatedModels]);
+    int currentModelIndex = modelManager.amtAnimatedModels;
+
+    const struct aiScene *assimpScene = aiImportFile(objPath, aiProcess_Triangulate |  aiProcess_JoinIdenticalVertices  |  aiProcess_CalcTangentSpace | aiProcess_FlipUVs);
+
+    if (assimpScene == NULL) {
+        printf("Failed to import model: %s\n", aiGetErrorString());
+        return;
+    }
+     
+    if (assimpScene->mNumMaterials == 0) {
+        printf("No materials detected\n");
+        return;
+    }
+    
+    modelManager.amtAnimatedModels++;
+
+
+    memset(currentModel, 0, sizeof(AnimatedModel));
+
+    char texturePaths[assimpScene->mNumMaterials][1024];
+    const char *modelTextures[assimpScene->mNumMaterials];
+    int materialIndexToTextureMap[assimpScene->mNumMaterials];
+    memset(texturePaths, 0, sizeof(texturePaths));
+    memset(modelTextures, 0, sizeof(modelTextures));
+
+    currentModel->boneMatrixLocation = glGetUniformLocation(animatedModelShader, "finalBonesMatrices");
+    currentModel->finalBoneMatrices = malloc(
+        sizeof(Mat4) * currentModel->boneCount
+    );
+    for(int i = 0; i < currentModel->boneCount; i++)
+    {
+        currentModel->finalBoneMatrices[i] = mat4Identity();
+    }
+
+    TextureData *textureData = malloc(sizeof(TextureData) * assimpScene->mNumMaterials);
+
+    int existingMaterialIndex = 0;
+
+    for (unsigned int materialIndex = 0; materialIndex < assimpScene->mNumMaterials; materialIndex++) {
+        const struct aiMaterial *material = assimpScene->mMaterials[materialIndex];
+        struct aiString texturePath;
+
+        if (aiGetMaterialTexture(material, aiTextureType_DIFFUSE, 0, &texturePath, NULL, NULL, NULL, NULL, NULL, NULL) != AI_SUCCESS) {
+            materialIndexToTextureMap[materialIndex] = -1;
+            continue;
+        }        
+
+        if (texturePath.data[0] == '*') {
+            int embeddedTextureIndex = atoi(&texturePath.data[1]);
+            const struct aiTexture *embeddedTexture = assimpScene->mTextures[embeddedTextureIndex];
+
+            if (embeddedTexture->mHeight == 0) {
+                int width, height, channels;
+
+                textureData[existingMaterialIndex].pixels = stbi_load_from_memory(
+                    (unsigned char*)embeddedTexture->pcData,
+                    embeddedTexture->mWidth,
+                    &width,
+                    &height,
+                    &channels,
+                    4
+                );
+
+                // printf("texture %d decoded: %dx%d channels=%d\n", embeddedTextureIndex, width, height, channels);
+
+            } else {
+                textureData[existingMaterialIndex].pixels = malloc(embeddedTexture->mWidth * embeddedTexture->mHeight * 4);
+                memcpy(textureData[existingMaterialIndex].pixels, embeddedTexture->pcData, embeddedTexture->mWidth * embeddedTexture->mHeight * 4);
+                textureData[existingMaterialIndex].width = embeddedTexture->mWidth;
+                textureData[existingMaterialIndex].height = embeddedTexture->mHeight;
+                textureData[existingMaterialIndex].channels = 4;
+            }
+        } else {
+            snprintf(texturePaths[existingMaterialIndex], sizeof(texturePaths[existingMaterialIndex]), "assets/OBJ/%s", texturePath.data);
+            modelTextures[existingMaterialIndex] = texturePaths[existingMaterialIndex];
+
+            textureData[existingMaterialIndex].pixels = stbi_load(modelTextures[existingMaterialIndex], &textureData[existingMaterialIndex].width, &textureData[existingMaterialIndex].height, &textureData[existingMaterialIndex].channels, 4);
+        }
+
+        if (textureData[existingMaterialIndex].pixels == NULL) {
+            printf("failed to load texture: %s\n", texturePath.data);
+            materialIndexToTextureMap[materialIndex] = -1;
+            continue;
+        }
+
+        materialIndexToTextureMap[materialIndex] = existingMaterialIndex;
+        existingMaterialIndex++;
+    }
+
+    for (unsigned int i = 0; i < assimpScene->mNumTextures; i++)
+    {
+        const struct aiTexture* tex = assimpScene->mTextures[i];
+    }
+
+
+    currentModel->textureArray = createTextureArray(textureData, existingMaterialIndex);
+
+    for (int i = 0; i < existingMaterialIndex; i++) {
+        stbi_image_free(textureData[i].pixels);
+    }
+
+    free(textureData);
+
+    int totalModelVertices = 0;
+    unsigned int totalModelFaces = 0;
+
+    for (unsigned int meshNumber = 0; meshNumber < assimpScene->mNumMeshes; meshNumber++) {
+        totalModelVertices += assimpScene->mMeshes[meshNumber]->mNumVertices;
+        totalModelFaces += assimpScene->mMeshes[meshNumber]->mNumFaces;
+    }
+
+    AnimatedModelVertex *modelVertices = malloc(sizeof(AnimatedModelVertex) * totalModelVertices);
+    currentModel->indexCount = totalModelFaces * 3;
+
+    unsigned int *modelIndices = malloc(currentModel->indexCount * sizeof(unsigned int));
+
+    unsigned int currentVertexNumber = 0;
+    unsigned int curIndicesIndex = 0;
+
+    for (unsigned int meshNumber = 0; meshNumber < assimpScene->mNumMeshes; meshNumber++) {
+        const struct aiMesh *mesh = assimpScene->mMeshes[meshNumber];
+        for (unsigned int i = 0; i < mesh->mNumVertices; i++) {
+            AnimatedModelVertex *vertex = &modelVertices[currentVertexNumber + i];
+
+            vertex->position[0] = mesh->mVertices[i].x;
+            vertex->position[1] = mesh->mVertices[i].y;
+            vertex->position[2] = mesh->mVertices[i].z;
+
+            vertex->normal[0] = mesh->mNormals[i].x;
+            vertex->normal[1] = mesh->mNormals[i].y;
+            vertex->normal[2] = mesh->mNormals[i].z;
+
+            if (mesh->mTextureCoords[0]) {
+                vertex->texCoord[0] = mesh->mTextureCoords[0][i].x;
+                vertex->texCoord[1] = mesh->mTextureCoords[0][i].y;
+            } else {
+                vertex->texCoord[0] = 0.0f;
+                vertex->texCoord[1] = 0.0f;
+            }
+
+            vertex->layer = (float)materialIndexToTextureMap[mesh->mMaterialIndex];
+
+            for (int j = 0; j < MAX_BONE_INFLUENCE; j++) {
+                vertex->boneIds[j] = -1;
+                vertex->boneWeights[j] = 0.0f;
+            }
+        }
+
+        for (unsigned int boneNumber = 0; boneNumber < mesh->mNumBones; boneNumber++) {
+            const struct aiBone *bone = mesh->mBones[boneNumber];
+            int boneId = getBoneId(currentModel, bone);
+
+            for (unsigned int weightNumber = 0; weightNumber < bone->mNumWeights; weightNumber++) {
+                const struct aiVertexWeight *weight = &bone->mWeights[weightNumber];
+                AnimatedModelVertex *vertex = &modelVertices[currentVertexNumber + weight->mVertexId];
+                setVertexBoneData(vertex, boneId, weight->mWeight);
+            }
+        }
+
+        for (unsigned int i = 0; i < mesh->mNumFaces; i++) {
+            const struct aiFace *face = &mesh->mFaces[i];
+            modelIndices[curIndicesIndex++] = face->mIndices[0] + currentVertexNumber;
+            modelIndices[curIndicesIndex++] = face->mIndices[1] + currentVertexNumber;
+            modelIndices[curIndicesIndex++] = face->mIndices[2] + currentVertexNumber;
+        }
+
+        currentVertexNumber += mesh->mNumVertices;
+    }
+
+    glGenVertexArrays(1, &currentModel->vao);
+    glGenBuffers(1, &currentModel->vbo);
+    glGenBuffers(1, &currentModel->ebo);
+
+    glBindVertexArray(currentModel->vao);
+
+    glBindBuffer(GL_ARRAY_BUFFER, currentModel->vbo);
+    glBufferData(GL_ARRAY_BUFFER, totalModelVertices * sizeof(AnimatedModelVertex), modelVertices, GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, currentModel->ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, currentModel->indexCount * sizeof(unsigned int), modelIndices, GL_STATIC_DRAW);
+
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(AnimatedModelVertex), (void *)offsetof(AnimatedModelVertex, position));
+    glEnableVertexAttribArray(0);
+
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(AnimatedModelVertex), (void *)offsetof(AnimatedModelVertex, normal));
+    glEnableVertexAttribArray(1);
+
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(AnimatedModelVertex), (void *)offsetof(AnimatedModelVertex, texCoord));
+    glEnableVertexAttribArray(2);
+
+    glVertexAttribPointer(3, 1, GL_FLOAT, GL_FALSE, sizeof(AnimatedModelVertex), (void *)offsetof(AnimatedModelVertex, layer));
+    glEnableVertexAttribArray(3);
+
+    glVertexAttribIPointer(4, MAX_BONE_INFLUENCE, GL_INT, sizeof(AnimatedModelVertex), (void *)offsetof(AnimatedModelVertex, boneIds));
+    glEnableVertexAttribArray(4);
+
+    glVertexAttribPointer(5, MAX_BONE_INFLUENCE, GL_FLOAT, GL_FALSE, sizeof(AnimatedModelVertex), (void *)offsetof(AnimatedModelVertex, boneWeights));
+    glEnableVertexAttribArray(5);
+
+    glBindVertexArray(0);
+
+    free(modelVertices);
+    free(modelIndices);
+
+    aiReleaseImport(assimpScene);
+
+    
+}
+
+
+
+
 void createModelInstance(Model *model, Vec3 *position, Vec3 *rotation, float scale) {
     if (model->instanceCount >= model->instanceCapacity) {
         model->instanceCapacity *= 2;
@@ -558,13 +883,17 @@ void initModelManager() {
     modelManager.capacity = 2;
     modelManager.models = malloc(sizeof(Model) * modelManager.capacity);
 
-    modelShader = glCreateProgram();
+    modelManager.amtAnimatedModels = 0;
+    modelManager.animatedModelCapacity = 2;
+    modelManager.animatedModels = malloc(sizeof(AnimatedModel) * modelManager.animatedModelCapacity);
 
+    modelShader = glCreateProgram();
+    
     GLuint modelVS = compileShader("modelShader.vert", GL_VERTEX_SHADER);
     GLuint modelFS = compileShader("modelShader.frag", GL_FRAGMENT_SHADER);
     glAttachShader(modelShader, modelVS);
     glAttachShader(modelShader, modelFS);
-
+    
     glBindAttribLocation(modelShader, 0, "position");
     glBindAttribLocation(modelShader, 1, "normal");
     glBindAttribLocation(modelShader, 2, "texCoord");
@@ -573,19 +902,41 @@ void initModelManager() {
     glBindAttribLocation(modelShader, 5, "instanceRotation");
     glBindAttribLocation(modelShader, 6, "instanceScale");
     glLinkProgram(modelShader);
+    
+    /////////
+    
+    animatedModelShader = glCreateProgram();
 
-    int treeModelIndex = initModel("assets/OBJ/CommonTree_1.obj");
-    int mushroomModelIndex = initModel("assets/OBJ/Mushroom_Common.obj");
+    GLuint animatedModelVS = compileShader("animatedModelShader.vert", GL_VERTEX_SHADER);
+    GLuint animatedModelFS = compileShader("animatedModelShader.frag", GL_FRAGMENT_SHADER);
+    glAttachShader(modelShader, animatedModelVS);
+    glAttachShader(modelShader, animatedModelFS);
 
-    // ! WARNING! dont try to make a pointer to the model, since it might not be valid after generating more instances
-    for (int i = 0; i < 100; i++)
-    {
-        createModelInstance(&modelManager.models[treeModelIndex], &(Vec3){33.0f+i*5, 60.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, 1.0f);
-    }
-    for (int i = 0; i < 100; i++)
-    {
-        createModelInstance(&modelManager.models[mushroomModelIndex], &(Vec3){27.0f-i*5, 60.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, 1.0f);
-    }
+    glBindAttribLocation(animatedModelShader, 0, "position");
+    glBindAttribLocation(animatedModelShader, 1, "normal");
+    glBindAttribLocation(animatedModelShader, 2, "texCoord");
+    glBindAttribLocation(animatedModelShader, 3, "layer"); // texture index
+    glBindAttribLocation(animatedModelShader, 4, "boneIds");
+    glBindAttribLocation(animatedModelShader, 5, "boneWeights");
+    glLinkProgram(animatedModelShader);
+
+
+    initAnimatedModel("assets/OBJ/Cleric.gltf");
+    // exit(5);
+
+    // int treeModelIndex = initModel("assets/OBJ/CommonTree_1.obj");
+    // int mushroomModelIndex = initModel("assets/OBJ/Mushroom_Common.obj");
+
+    // // ! WARNING! dont try to make a pointer to the model, since it might not be valid after generating more instances
+    // for (int i = 0; i < 100; i++)
+    // {
+    //     createModelInstance(&modelManager.models[treeModelIndex], &(Vec3){33.0f+i*5, 60.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, 1.0f);
+    // }
+    // for (int i = 0; i < 100; i++)
+    // {
+    //     createModelInstance(&modelManager.models[mushroomModelIndex], &(Vec3){27.0f-i*5, 60.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, 1.0f);
+    // }
+
 
 }
 
@@ -2022,6 +2373,33 @@ void renderModel(Model *model) {
     glBindVertexArray(0);
 }
 
+void renderAnimatedModel(AnimatedModel *model) {
+    glUseProgram(animatedModelShader);
+
+    glUniformMatrix4fv(
+        model->boneMatrixLocation,
+        model->boneCount,
+        GL_FALSE,
+        (float*)model->finalBoneMatrices
+    );
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D_ARRAY, model->textureArray);
+
+    glUniform1i(glGetUniformLocation(animatedModelShader, "modelTextures"), 0);
+
+    glBindVertexArray(model->vao);
+
+    glDrawElements(
+        GL_TRIANGLES,
+        model->indexCount,
+        GL_UNSIGNED_INT,
+        0
+    );
+
+    glBindVertexArray(0);
+}
+
 void drawGraphics()
 {
     frameCount++;
@@ -2144,12 +2522,16 @@ void drawGraphics()
         }
     }
 
-    for (unsigned int i = 0; i < modelManager.amtModels; i++) {
-        renderModel(&modelManager.models[i]);
-    }
-    updateModelInstance(&modelManager.models[0], 0, &(Vec3){33.0f, 60.0f, 0.0f}, &(Vec3){currentTime, 0.0f, 0.0f}, 1.0f);
-    updateModelInstance(&modelManager.models[0], 1, &(Vec3){27.0f, 60.0f, 0.0f}, &(Vec3){0.0f, currentTime, 0.0f}, 1.0f);
-    updateModelInstance(&modelManager.models[1], 0, &(Vec3){39.0f, 60.0f, 0.0f}, &(Vec3){0.0f, 0.0f, currentTime}, 1.0f);
+    
+
+    renderAnimatedModel(&modelManager.animatedModels[0]);
+    
+    // for (unsigned int i = 0; i < modelManager.amtModels; i++) {
+    //     renderModel(&modelManager.models[i]);
+    // }
+    // updateModelInstance(&modelManager.models[0], 0, &(Vec3){33.0f, 60.0f, 0.0f}, &(Vec3){currentTime, 0.0f, 0.0f}, 1.0f);
+    // updateModelInstance(&modelManager.models[0], 1, &(Vec3){27.0f, 60.0f, 0.0f}, &(Vec3){0.0f, currentTime, 0.0f}, 1.0f);
+    // updateModelInstance(&modelManager.models[1], 0, &(Vec3){39.0f, 60.0f, 0.0f}, &(Vec3){0.0f, 0.0f, currentTime}, 1.0f);
     
 
     buildWorldMesh(); // fills worldVertices and worldVertexCount

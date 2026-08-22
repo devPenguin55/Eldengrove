@@ -78,6 +78,8 @@ float getLight(int x, int y, int z)
 
 void main()
 {
+    discard;
+    
     int layer = int(fragIn.fragLayer);
 
     vec4 texColor; 

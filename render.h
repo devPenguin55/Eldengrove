@@ -3,6 +3,10 @@
 #include <GL/glu.h>
 #include <GL/glut.h>
 #include "chunks.h"
+#include "vectors.h"
+
+
+#define MAX_BONE_INFLUENCE 4
 
 typedef struct UV
 {
@@ -42,11 +46,36 @@ typedef struct ModelVertex {
     float layer;
 } ModelVertex;
 
+typedef struct AnimatedModelVertex{
+    float position[3];
+    float normal[3];
+    float texCoord[2];
+    float layer;
+    int boneIds[MAX_BONE_INFLUENCE];
+    float boneWeights[MAX_BONE_INFLUENCE];
+} AnimatedModelVertex;
+
+typedef struct TextureData {
+    unsigned char *pixels;
+    int width;
+    int height;
+    int channels;
+} TextureData;
+
 typedef struct ModelInstance {
     float position[3];
     float rotation[3];
     float scale;
 } ModelInstance;
+
+// typedef struct AnimatedModelInstance{
+//     float position[3];
+//     float rotation[3];
+//     float scale;
+
+//     int animationIndex;
+//     float animationTime;
+// } AnimatedModelInstance;
 
 typedef struct Model {
     GLuint vao;
@@ -61,10 +90,85 @@ typedef struct Model {
     unsigned int instanceCapacity;
 } Model;
 
+typedef struct BoneInfo {
+    char name[128];
+
+    Mat4 offsetMatrix;
+} BoneInfo;
+
+typedef struct Bone {
+    char name[128];
+    int id;
+    Mat4 offsetMatrix;
+    Mat4 localTransform;
+    Mat4 globalTransform;
+    struct Bone *parent;
+} Bone;
+
+typedef struct PositionKey {
+    double time;
+    Vec3 value;
+} PositionKey;
+
+typedef struct RotationKey {
+    double time;
+    Quat value;
+} RotationKey;
+
+typedef struct ScaleKey {
+    double time;
+    Vec3 value;
+} ScaleKey;
+
+typedef struct AnimationChannel {
+    char nodeName[128];
+
+    PositionKey *positionKeys;
+    unsigned int positionKeyCount;
+
+    RotationKey *rotationKeys;
+    unsigned int rotationKeyCount;
+
+    ScaleKey *scaleKeys;
+    unsigned int scaleKeyCount;
+} AnimationChannel;
+
+typedef struct Animation {
+    char name[128];
+
+    double duration;
+    double ticksPerSecond;
+
+    AnimationChannel *channels;
+    unsigned int channelCount;
+} Animation;
+
+typedef struct AnimatedModel {
+    GLuint vao;
+    GLuint vbo;
+    GLuint ebo;
+    GLuint instanceVBO;
+    GLuint textureArray;
+    unsigned int indexCount;
+
+    BoneInfo *bones;
+    unsigned int boneCount;
+
+    Animation *animations;
+    unsigned int animationCount;
+    
+    Mat4 *finalBoneMatrices;
+    GLint boneMatrixLocation;
+} AnimatedModel;
+
 typedef struct ModelManager {
     int amtModels;
     int  capacity;
     Model *models;
+
+    int amtAnimatedModels;
+    int animatedModelCapacity;
+    AnimatedModel *animatedModels;
 } ModelManager;
 
 extern GLfloat T;
