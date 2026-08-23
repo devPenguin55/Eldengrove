@@ -55,6 +55,14 @@ typedef struct AnimatedModelVertex{
     float boneWeights[MAX_BONE_INFLUENCE];
 } AnimatedModelVertex;
 
+typedef struct ModelNode {  
+    char name[128];  
+    Mat4 transformation; // local bind-pose transform (from aiNode->mTransformation)  
+    struct ModelNode *parent;  
+    struct ModelNode **children;  
+    unsigned int childCount;  
+} ModelNode;
+
 typedef struct TextureData {
     unsigned char *pixels;
     int width;
@@ -159,6 +167,9 @@ typedef struct AnimatedModel {
     
     Mat4 *finalBoneMatrices;
     GLint boneMatrixLocation;
+
+    ModelNode *rootNode;
+    Mat4 globalInverseTransform;
 } AnimatedModel;
 
 typedef struct ModelManager {

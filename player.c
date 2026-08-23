@@ -115,6 +115,7 @@ float getSlopeHeight(Block* block, float x, float z)
 }
 
 int playerCollides(Player* player) { 
+    return 0;
     float minX = player->position.x - playerHalfWidth(player); 
     float maxX = player->position.x + playerHalfWidth(player); 
     float minY = player->position.y; 
@@ -194,7 +195,8 @@ int playerCollides(Player* player) {
 
 void updatePlayerPhysics(Player* player)
 {
-    const float gravity = (player->isInWater) ? (5.0f) : (20.0f);
+    float gravity = (player->isInWater) ? (5.0f) : (20.0f);
+    gravity = 0.0;
     int slopeDirCur = slopeDir(player);
     player->velocity.y -= gravity * DELTA_TIME;
     

@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include <math.h>
 #include <assimp/matrix4x4.h>
+#include <stdio.h>
 #include "vectors.h"
 
 Vec3 vec3Add(Vec3 a, Vec3 b) {
@@ -71,6 +72,20 @@ Mat4 mat4Scale(Vec3 scale) {
 }
 
 Mat4 mat4FromQuat(Quat rotation) {
+    float length = sqrtf(
+        rotation.x * rotation.x +
+        rotation.y * rotation.y +
+        rotation.z * rotation.z +
+        rotation.w * rotation.w
+    );
+
+    if (length > 0.000001f) {
+        rotation.x /= length;
+        rotation.y /= length;
+        rotation.z /= length;
+        rotation.w /= length;
+    }
+
     Mat4 result = mat4Identity();
 
     float x = rotation.x;
@@ -81,11 +96,9 @@ Mat4 mat4FromQuat(Quat rotation) {
     float xx = x * x;
     float yy = y * y;
     float zz = z * z;
-
     float xy = x * y;
     float xz = x * z;
     float yz = y * z;
-
     float wx = w * x;
     float wy = w * y;
     float wz = w * z;
@@ -246,6 +259,7 @@ Mat4 mat4Inverse(Mat4 matrix) {
         m[3] * inv[12];
 
     if (fabsf(determinant) < 0.000001f) {
+        printf("WARNING: singular matrix, determinant = %f\n", determinant);
         return mat4Identity();
     }
 
@@ -256,6 +270,24 @@ Mat4 mat4Inverse(Mat4 matrix) {
     }
 
     return result;
+}
+
+Quat quatNormalize(Quat q) {
+    float length = sqrtf(
+        q.x * q.x +
+        q.y * q.y +
+        q.z * q.z +
+        q.w * q.w
+    );
+
+    if (length > 0.000001f) {
+        q.x /= length;
+        q.y /= length;
+        q.z /= length;
+        q.w /= length;
+    }
+
+    return q;
 }
 
 Vec3 vec3Lerp(Vec3 a, Vec3 b, float t) {
@@ -269,7 +301,8 @@ Vec3 vec3Lerp(Vec3 a, Vec3 b, float t) {
 }
 
 Quat quatSlerp(Quat a, Quat b, float t) {
-    Quat result;
+    a = quatNormalize(a);
+    b = quatNormalize(b);
 
     float dot =
         a.x * b.x +
@@ -277,38 +310,25 @@ Quat quatSlerp(Quat a, Quat b, float t) {
         a.z * b.z +
         a.w * b.w;
 
-    // Make sure we take the shortest path.
     if (dot < 0.0f) {
         b.x = -b.x;
         b.y = -b.y;
         b.z = -b.z;
         b.w = -b.w;
-
         dot = -dot;
     }
 
-    // If the quaternions are very close, use linear interpolation.
+    dot = fminf(fmaxf(dot, -1.0f), 1.0f);
+
     if (dot > 0.9995f) {
-        result.x = a.x + t * (b.x - a.x);
-        result.y = a.y + t * (b.y - a.y);
-        result.z = a.z + t * (b.z - a.z);
-        result.w = a.w + t * (b.w - a.w);
+        Quat result = {
+            a.x + t * (b.x - a.x),
+            a.y + t * (b.y - a.y),
+            a.z + t * (b.z - a.z),
+            a.w + t * (b.w - a.w)
+        };
 
-        float length = sqrtf(
-            result.x * result.x +
-            result.y * result.y +
-            result.z * result.z +
-            result.w * result.w
-        );
-
-        if (length > 0.000001f) {
-            result.x /= length;
-            result.y /= length;
-            result.z /= length;
-            result.w /= length;
-        }
-
-        return result;
+        return quatNormalize(result);
     }
 
     float theta = acosf(dot);
@@ -317,12 +337,14 @@ Quat quatSlerp(Quat a, Quat b, float t) {
     float weightA = sinf((1.0f - t) * theta) / sinTheta;
     float weightB = sinf(t * theta) / sinTheta;
 
-    result.x = a.x * weightA + b.x * weightB;
-    result.y = a.y * weightA + b.y * weightB;
-    result.z = a.z * weightA + b.z * weightB;
-    result.w = a.w * weightA + b.w * weightB;
+    Quat result = {
+        a.x * weightA + b.x * weightB,
+        a.y * weightA + b.y * weightB,
+        a.z * weightA + b.z * weightB,
+        a.w * weightA + b.w * weightB
+    };
 
-    return result;
+    return quatNormalize(result);
 }
 
 Mat4 mat4FromAiMatrix4x4(struct aiMatrix4x4 matrix) {

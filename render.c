@@ -595,6 +595,19 @@ GLuint createTextureArray(
     return textureArray;
 }
 
+ModelNode *copyNodeTree(const struct aiNode *ainode, ModelNode *parent) {  
+    ModelNode *node = malloc(sizeof(ModelNode));  
+    strncpy(node->name, ainode->mName.data, sizeof(node->name) - 1);  
+    node->transformation = mat4FromAiMatrix4x4(ainode->mTransformation);  
+    node->parent = parent;  
+    node->childCount = ainode->mNumChildren;  
+    node->children = malloc(sizeof(ModelNode*) * ainode->mNumChildren);  
+    for (unsigned int i = 0; i < ainode->mNumChildren; i++) {  
+        node->children[i] = copyNodeTree(ainode->mChildren[i], node);  
+    }  
+    return node;  
+}  
+  
 
 void initAnimatedModel(const char *objPath) {
     if (modelManager.amtAnimatedModels >= modelManager.animatedModelCapacity) {
@@ -627,14 +640,6 @@ void initAnimatedModel(const char *objPath) {
     memset(texturePaths, 0, sizeof(texturePaths));
     memset(modelTextures, 0, sizeof(modelTextures));
 
-    currentModel->boneMatrixLocation = glGetUniformLocation(animatedModelShader, "finalBonesMatrices");
-    currentModel->finalBoneMatrices = malloc(
-        sizeof(Mat4) * currentModel->boneCount
-    );
-    for(int i = 0; i < currentModel->boneCount; i++)
-    {
-        currentModel->finalBoneMatrices[i] = mat4Identity();
-    }
 
     TextureData *textureData = malloc(sizeof(TextureData) * assimpScene->mNumMaterials);
 
@@ -653,21 +658,22 @@ void initAnimatedModel(const char *objPath) {
             int embeddedTextureIndex = atoi(&texturePath.data[1]);
             const struct aiTexture *embeddedTexture = assimpScene->mTextures[embeddedTextureIndex];
 
-            if (embeddedTexture->mHeight == 0) {
-                int width, height, channels;
-
-                textureData[existingMaterialIndex].pixels = stbi_load_from_memory(
-                    (unsigned char*)embeddedTexture->pcData,
-                    embeddedTexture->mWidth,
-                    &width,
-                    &height,
-                    &channels,
-                    4
-                );
-
-                // printf("texture %d decoded: %dx%d channels=%d\n", embeddedTextureIndex, width, height, channels);
-
-            } else {
+            if (embeddedTexture->mHeight == 0) {  
+                int width, height, channels;  
+  
+                textureData[existingMaterialIndex].pixels = stbi_load_from_memory(  
+                    (unsigned char*)embeddedTexture->pcData,  
+                    embeddedTexture->mWidth,  
+                    &width,  
+                    &height,  
+                    &channels,  
+                    4  
+                );  
+   
+                textureData[existingMaterialIndex].width = 512;  
+                textureData[existingMaterialIndex].height = 512;  
+                textureData[existingMaterialIndex].channels = 4;  
+            }else {
                 textureData[existingMaterialIndex].pixels = malloc(embeddedTexture->mWidth * embeddedTexture->mHeight * 4);
                 memcpy(textureData[existingMaterialIndex].pixels, embeddedTexture->pcData, embeddedTexture->mWidth * embeddedTexture->mHeight * 4);
                 textureData[existingMaterialIndex].width = embeddedTexture->mWidth;
@@ -778,6 +784,11 @@ void initAnimatedModel(const char *objPath) {
     glBindVertexArray(currentModel->vao);
 
     glBindBuffer(GL_ARRAY_BUFFER, currentModel->vbo);
+    currentModel->boneMatrixLocation = glGetUniformLocation(animatedModelShader, "finalBonesMatrices");  
+    currentModel->finalBoneMatrices = malloc(sizeof(Mat4) * currentModel->boneCount);  
+    for (unsigned int i = 0; i < currentModel->boneCount; i++) {  
+        currentModel->finalBoneMatrices[i] = mat4Identity();  
+    }
     glBufferData(GL_ARRAY_BUFFER, totalModelVertices * sizeof(AnimatedModelVertex), modelVertices, GL_STATIC_DRAW);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, currentModel->ebo);
@@ -806,9 +817,204 @@ void initAnimatedModel(const char *objPath) {
     free(modelVertices);
     free(modelIndices);
 
+    currentModel->animationCount = assimpScene->mNumAnimations;  
+    currentModel->animations = malloc(sizeof(Animation) * currentModel->animationCount);  
+  
+    for (unsigned int a = 0; a < assimpScene->mNumAnimations; a++) {  
+        const struct aiAnimation *aiAnim = assimpScene->mAnimations[a];  
+        Animation *anim = &currentModel->animations[a];  
+  
+        strncpy(anim->name, aiAnim->mName.data, sizeof(anim->name) - 1);  
+        anim->duration = aiAnim->mDuration;  
+        anim->ticksPerSecond = aiAnim->mTicksPerSecond != 0 ? aiAnim->mTicksPerSecond : 25.0;  
+  
+        anim->channelCount = aiAnim->mNumChannels;  
+        anim->channels = malloc(sizeof(AnimationChannel) * anim->channelCount);  
+  
+        for (unsigned int c = 0; c < aiAnim->mNumChannels; c++) {  
+            const struct aiNodeAnim *nodeAnim = aiAnim->mChannels[c];  
+            AnimationChannel *channel = &anim->channels[c];  
+  
+            strncpy(channel->nodeName, nodeAnim->mNodeName.data, sizeof(channel->nodeName) - 1);  
+  
+            printf(
+                "%s: position=%u rotation=%u scale=%u\n",
+                nodeAnim->mNodeName.data,
+                nodeAnim->mNumPositionKeys,
+                nodeAnim->mNumRotationKeys,
+                nodeAnim->mNumScalingKeys
+            );
+
+            channel->positionKeyCount = nodeAnim->mNumPositionKeys;  
+            channel->positionKeys = malloc(sizeof(PositionKey) * channel->positionKeyCount);  
+            for (unsigned int k = 0; k < nodeAnim->mNumPositionKeys; k++) {  
+                channel->positionKeys[k].time = nodeAnim->mPositionKeys[k].mTime;  
+                channel->positionKeys[k].value = (Vec3){  
+                    nodeAnim->mPositionKeys[k].mValue.x,  
+                    nodeAnim->mPositionKeys[k].mValue.y,  
+                    nodeAnim->mPositionKeys[k].mValue.z  
+                };  
+            }  
+  
+            channel->rotationKeyCount = nodeAnim->mNumRotationKeys;  
+            channel->rotationKeys = malloc(sizeof(RotationKey) * channel->rotationKeyCount);  
+            for (unsigned int k = 0; k < nodeAnim->mNumRotationKeys; k++) {  
+                channel->rotationKeys[k].time = nodeAnim->mRotationKeys[k].mTime;  
+                channel->rotationKeys[k].value = (Quat){  
+                    nodeAnim->mRotationKeys[k].mValue.x,  
+                    nodeAnim->mRotationKeys[k].mValue.y,  
+                    nodeAnim->mRotationKeys[k].mValue.z,  
+                    nodeAnim->mRotationKeys[k].mValue.w  
+                };  
+            }  
+  
+            channel->scaleKeyCount = nodeAnim->mNumScalingKeys;  
+            channel->scaleKeys = malloc(sizeof(ScaleKey) * channel->scaleKeyCount);  
+            for (unsigned int k = 0; k < nodeAnim->mNumScalingKeys; k++) {  
+                channel->scaleKeys[k].time = nodeAnim->mScalingKeys[k].mTime;  
+                channel->scaleKeys[k].value = (Vec3){  
+                    nodeAnim->mScalingKeys[k].mValue.x,  
+                    nodeAnim->mScalingKeys[k].mValue.y,  
+                    nodeAnim->mScalingKeys[k].mValue.z  
+                };  
+            }  
+        }  
+    }
+
+    printf("%d animations", assimpScene->mNumAnimations);
+
+    currentModel->rootNode = copyNodeTree(assimpScene->mRootNode, NULL);
+    currentModel->globalInverseTransform = mat4Inverse(
+        mat4FromAiMatrix4x4(assimpScene->mRootNode->mTransformation)
+    );
+    for (unsigned int a = 0; a < assimpScene->mNumAnimations; a++) {
+        const struct aiAnimation *aiAnim = assimpScene->mAnimations[a];
+
+        printf(
+            "Animation %u: '%s' duration=%f channels=%u\n",
+            a,
+            aiAnim->mName.data,
+            aiAnim->mDuration,
+            aiAnim->mNumChannels
+        );
+
+        for (unsigned int c = 0; c < aiAnim->mNumChannels; c++) {
+            printf(
+                "    %s\n",
+                aiAnim->mChannels[c]->mNodeName.data
+            );
+        }
+    }
+
+    
     aiReleaseImport(assimpScene);
 
     
+}
+
+AnimationChannel *findChannel(Animation *anim, const char *nodeName) {  
+    for (unsigned int i = 0; i < anim->channelCount; i++) {  
+        if (strcmp(anim->channels[i].nodeName, nodeName) == 0) {  
+            return &anim->channels[i];  
+        }  
+    }  
+    return NULL;  
+}  
+  
+Vec3 interpolatePosition(AnimationChannel *channel, double time) {  
+    if (channel->positionKeyCount == 0) return (Vec3){0,0,0};  
+    if (channel->positionKeyCount == 1) return channel->positionKeys[0].value;  
+  
+    for (unsigned int i = 0; i < channel->positionKeyCount - 1; i++) {  
+        if (time < channel->positionKeys[i+1].time) {  
+            double t0 = channel->positionKeys[i].time;  
+            double t1 = channel->positionKeys[i+1].time;  
+            float factor = (float)((time - t0) / (t1 - t0));  
+            return vec3Lerp(channel->positionKeys[i].value, channel->positionKeys[i+1].value, factor);  
+        }  
+    }  
+    return channel->positionKeys[channel->positionKeyCount - 1].value;  
+}  
+  
+Quat interpolateRotation(AnimationChannel *channel, double time) {  
+    if (channel->rotationKeyCount == 0) return (Quat){0,0,0,1};  
+    if (channel->rotationKeyCount == 1) return channel->rotationKeys[0].value;  
+  
+    for (unsigned int i = 0; i < channel->rotationKeyCount - 1; i++) {  
+        if (time < channel->rotationKeys[i+1].time) {  
+            double t0 = channel->rotationKeys[i].time;  
+            double t1 = channel->rotationKeys[i+1].time;  
+            float factor = (float)((time - t0) / (t1 - t0));  
+            return quatSlerp(channel->rotationKeys[i].value, channel->rotationKeys[i+1].value, factor);  
+        }  
+    }  
+    return channel->rotationKeys[channel->rotationKeyCount - 1].value;  
+}  
+  
+Vec3 interpolateScale(AnimationChannel *channel, double time) {  
+    if (channel->scaleKeyCount == 0) return (Vec3){1,1,1};  
+    if (channel->scaleKeyCount == 1) return channel->scaleKeys[0].value;  
+  
+    for (unsigned int i = 0; i < channel->scaleKeyCount - 1; i++) {  
+        if (time < channel->scaleKeys[i+1].time) {  
+            double t0 = channel->scaleKeys[i].time;  
+            double t1 = channel->scaleKeys[i+1].time;  
+            float factor = (float)((time - t0) / (t1 - t0));  
+            return vec3Lerp(channel->scaleKeys[i].value, channel->scaleKeys[i+1].value, factor);  
+        }  
+    }  
+    return channel->scaleKeys[channel->scaleKeyCount - 1].value;  
+}  
+  
+void updateBoneHierarchy(  
+    AnimatedModel *model,  
+    ModelNode *node,  
+    Animation *anim,  
+    double animationTime,  
+    Mat4 parentTransform  
+) {  
+    Mat4 nodeTransform = node->transformation; 
+  
+    AnimationChannel *channel = findChannel(anim, node->name);  
+    if (channel != NULL && node->parent != NULL) {
+        Vec3 pos = interpolatePosition(channel, animationTime);  
+        Quat rot = interpolateRotation(channel, animationTime);  
+        Vec3 scale = interpolateScale(channel, animationTime);  
+  
+        Mat4 translation = mat4Translate(pos);  
+        Mat4 rotation = mat4FromQuat(rot);  
+        Mat4 scaling = mat4Scale(scale);  
+  
+        nodeTransform = mat4Multiply(translation, mat4Multiply(rotation, scaling));  
+    }  
+  
+    Mat4 globalTransform = mat4Multiply(parentTransform, nodeTransform);  
+  
+    for (unsigned int i = 0; i < model->boneCount; i++) {  
+        if (strcmp(model->bones[i].name, node->name) == 0) {  
+            model->finalBoneMatrices[i] = mat4Multiply(
+                model->globalInverseTransform,
+                mat4Multiply(globalTransform, model->bones[i].offsetMatrix)
+            );
+            break;  
+        }  
+    }  
+  
+    for (unsigned int i = 0; i < node->childCount; i++) {  
+        updateBoneHierarchy(model, node->children[i], anim, animationTime, globalTransform);  
+    }  
+}  
+  
+void updateAnimation(AnimatedModel *model, int animationIndex, double deltaTime) {  
+    if (model->animationCount == 0 || model->rootNode == NULL) return;  
+  
+    Animation *anim = &model->animations[animationIndex];  
+  
+    static double currentTime = 0.0;  
+    currentTime += deltaTime * anim->ticksPerSecond;  
+    currentTime = fmod(currentTime, anim->duration);  
+  
+    updateBoneHierarchy(model, model->rootNode, anim, currentTime, mat4Identity());  
 }
 
 
@@ -904,13 +1110,13 @@ void initModelManager() {
     glLinkProgram(modelShader);
     
     /////////
-    
+     
     animatedModelShader = glCreateProgram();
 
     GLuint animatedModelVS = compileShader("animatedModelShader.vert", GL_VERTEX_SHADER);
     GLuint animatedModelFS = compileShader("animatedModelShader.frag", GL_FRAGMENT_SHADER);
-    glAttachShader(modelShader, animatedModelVS);
-    glAttachShader(modelShader, animatedModelFS);
+    glAttachShader(animatedModelShader, animatedModelVS);
+    glAttachShader(animatedModelShader, animatedModelFS);
 
     glBindAttribLocation(animatedModelShader, 0, "position");
     glBindAttribLocation(animatedModelShader, 1, "normal");
@@ -921,7 +1127,8 @@ void initModelManager() {
     glLinkProgram(animatedModelShader);
 
 
-    initAnimatedModel("assets/OBJ/Cleric.gltf");
+
+    initAnimatedModel("assets/OBJ/CesiumMan.gltf");
     // exit(5);
 
     // int treeModelIndex = initModel("assets/OBJ/CommonTree_1.obj");
@@ -2379,16 +2586,19 @@ void renderAnimatedModel(AnimatedModel *model) {
     glUniformMatrix4fv(
         model->boneMatrixLocation,
         model->boneCount,
-        GL_FALSE,
-        (float*)model->finalBoneMatrices
+        GL_TRUE,
+        (float*)model->finalBoneMatrices 
     );
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D_ARRAY, model->textureArray);
 
     glUniform1i(glGetUniformLocation(animatedModelShader, "modelTextures"), 0);
+    glUniform3f(glGetUniformLocation(animatedModelShader, "lightPos"), 0.0f, 100.0, 0.0f);  
+    glUniform3f(glGetUniformLocation(animatedModelShader, "viewPos"), eyeX, eyeY, eyeZ);
 
     glBindVertexArray(model->vao);
+    
 
     glDrawElements(
         GL_TRIANGLES,
@@ -2404,7 +2614,6 @@ void drawGraphics()
 {
     frameCount++;
     double currentTime = glutGet(GLUT_ELAPSED_TIME) / 1000.0; // seconds
-
     // update FPS every 0.25 seconds
     if (currentTime - lastFpsTime >= 0.25)
     {
@@ -2523,9 +2732,8 @@ void drawGraphics()
     }
 
     
-
+    updateAnimation(&modelManager.animatedModels[0], 0, DELTA_TIME);  
     renderAnimatedModel(&modelManager.animatedModels[0]);
-    
     // for (unsigned int i = 0; i < modelManager.amtModels; i++) {
     //     renderModel(&modelManager.models[i]);
     // }
