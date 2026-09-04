@@ -1385,7 +1385,7 @@ void initModelManager() {
     for (int i = 0; i < 10; i++) {
         createAnimatedModelInstance(
             cleric,
-            &(Vec3){i * 2.0f, 0.0f, 0.0f},
+            &(Vec3){i * 2.0f +33.0f, 0.0f +60.0f, 0.0f},
             &(Vec3){i*15.0f, i*5.0f, i*5.0f},
             1.0f - i*0.1f,
             i
@@ -1393,7 +1393,7 @@ void initModelManager() {
 
         createAnimatedModelInstance(
             cesium,
-            &(Vec3){i * 2.0f, 0.0f, 2.0f},
+            &(Vec3){i * 2.0f +33.0f, 0.0f+60.0f, 2.0f},
             &(Vec3){i*-15.0f, i*-5.0f, i*-5.0f},
             2.0f - i*0.1f,
             0
