@@ -151,6 +151,12 @@ typedef struct Animation {
     unsigned int channelCount;
 } Animation;
 
+typedef struct {
+    float position[3];
+    float rotation[3];
+    float scale;
+} AnimatedModelInstance;
+
 typedef struct AnimatedModel {
     GLuint vao;
     GLuint vbo;
@@ -170,6 +176,11 @@ typedef struct AnimatedModel {
 
     ModelNode *rootNode;
     Mat4 globalInverseTransform;
+
+
+    AnimatedModelInstance *instances;
+    unsigned int instanceCount;
+    unsigned int instanceCapacity;
 } AnimatedModel;
 
 typedef struct ModelManager {

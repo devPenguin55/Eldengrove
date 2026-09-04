@@ -609,7 +609,7 @@ ModelNode *copyNodeTree(const struct aiNode *ainode, ModelNode *parent) {
 }  
   
 
-void initAnimatedModel(const char *objPath) {
+int initAnimatedModel(const char *objPath) {
     if (modelManager.amtAnimatedModels >= modelManager.animatedModelCapacity) {
         modelManager.animatedModelCapacity *= 2;
         modelManager.animatedModels = realloc(modelManager.animatedModels, sizeof(AnimatedModel) * modelManager.animatedModelCapacity);
@@ -621,12 +621,12 @@ void initAnimatedModel(const char *objPath) {
 
     if (assimpScene == NULL) {
         printf("Failed to import model: %s\n", aiGetErrorString());
-        return;
+        return -1;
     }
      
     if (assimpScene->mNumMaterials == 0) {
         printf("No materials detected\n");
-        return;
+        return -1;
     }
     
     modelManager.amtAnimatedModels++;
@@ -781,6 +781,13 @@ void initAnimatedModel(const char *objPath) {
     glGenBuffers(1, &currentModel->vbo);
     glGenBuffers(1, &currentModel->ebo);
 
+    glGenBuffers(1, &currentModel->instanceVBO);
+    currentModel->instanceCapacity = 16;
+    currentModel->instanceCount = 0;
+    currentModel->instances = malloc(
+        sizeof(AnimatedModelInstance) * currentModel->instanceCapacity
+    );
+
     glBindVertexArray(currentModel->vao);
 
     glBindBuffer(GL_ARRAY_BUFFER, currentModel->vbo);
@@ -812,8 +819,49 @@ void initAnimatedModel(const char *objPath) {
     glVertexAttribPointer(5, MAX_BONE_INFLUENCE, GL_FLOAT, GL_FALSE, sizeof(AnimatedModelVertex), (void *)offsetof(AnimatedModelVertex, boneWeights));
     glEnableVertexAttribArray(5);
 
-    glBindVertexArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, currentModel->instanceVBO);
 
+    glBufferData(
+        GL_ARRAY_BUFFER,
+        sizeof(AnimatedModelInstance) * currentModel->instanceCapacity,
+        NULL,
+        GL_DYNAMIC_DRAW
+    );
+
+    glVertexAttribPointer(
+        6,
+        3,
+        GL_FLOAT,
+        GL_FALSE,
+        sizeof(AnimatedModelInstance),
+        (void *)offsetof(AnimatedModelInstance, position)
+    );
+    glEnableVertexAttribArray(6);
+    glVertexAttribDivisor(6, 1);
+
+    glVertexAttribPointer(
+        7,
+        3,
+        GL_FLOAT,
+        GL_FALSE,
+        sizeof(AnimatedModelInstance),
+        (void *)offsetof(AnimatedModelInstance, rotation)
+    );
+    glEnableVertexAttribArray(7);
+    glVertexAttribDivisor(7, 1);
+
+    glVertexAttribPointer(
+        8,
+        1,
+        GL_FLOAT,
+        GL_FALSE,
+        sizeof(AnimatedModelInstance),
+        (void *)offsetof(AnimatedModelInstance, scale)
+    );
+    glEnableVertexAttribArray(8);
+    glVertexAttribDivisor(8, 1);
+
+    glBindVertexArray(0);
     free(modelVertices);
     free(modelIndices);
 
@@ -837,13 +885,13 @@ void initAnimatedModel(const char *objPath) {
   
             strncpy(channel->nodeName, nodeAnim->mNodeName.data, sizeof(channel->nodeName) - 1);  
   
-            printf(
-                "%s: position=%u rotation=%u scale=%u\n",
-                nodeAnim->mNodeName.data,
-                nodeAnim->mNumPositionKeys,
-                nodeAnim->mNumRotationKeys,
-                nodeAnim->mNumScalingKeys
-            );
+            // printf(
+            //     "%s: position=%u rotation=%u scale=%u\n",
+            //     nodeAnim->mNodeName.data,
+            //     nodeAnim->mNumPositionKeys,
+            //     nodeAnim->mNumRotationKeys,
+            //     nodeAnim->mNumScalingKeys
+            // );
 
             channel->positionKeyCount = nodeAnim->mNumPositionKeys;  
             channel->positionKeys = malloc(sizeof(PositionKey) * channel->positionKeyCount);  
@@ -887,29 +935,11 @@ void initAnimatedModel(const char *objPath) {
     currentModel->globalInverseTransform = mat4Inverse(
         mat4FromAiMatrix4x4(assimpScene->mRootNode->mTransformation)
     );
-    for (unsigned int a = 0; a < assimpScene->mNumAnimations; a++) {
-        const struct aiAnimation *aiAnim = assimpScene->mAnimations[a];
-
-        printf(
-            "Animation %u: '%s' duration=%f channels=%u\n",
-            a,
-            aiAnim->mName.data,
-            aiAnim->mDuration,
-            aiAnim->mNumChannels
-        );
-
-        for (unsigned int c = 0; c < aiAnim->mNumChannels; c++) {
-            printf(
-                "    %s\n",
-                aiAnim->mChannels[c]->mNodeName.data
-            );
-        }
-    }
 
     
     aiReleaseImport(assimpScene);
 
-    
+    return currentModelIndex;
 }
 
 AnimationChannel *findChannel(Animation *anim, const char *nodeName) {  
@@ -1084,6 +1114,54 @@ void updateModelInstance(Model *model, int instanceIndex, Vec3 *newPosition, Vec
     );
 }
 
+void createAnimatedModelInstance(
+    AnimatedModel *model,
+    Vec3 *position,
+    Vec3 *rotation,
+    float scale
+) {
+    if (model->instanceCount >= model->instanceCapacity) {
+        model->instanceCapacity *= 2;
+
+        model->instances = realloc(
+            model->instances,
+            sizeof(AnimatedModelInstance) * model->instanceCapacity
+        );
+
+        glBindBuffer(GL_ARRAY_BUFFER, model->instanceVBO);
+
+        glBufferData(
+            GL_ARRAY_BUFFER,
+            sizeof(AnimatedModelInstance) * model->instanceCapacity,
+            NULL,
+            GL_DYNAMIC_DRAW
+        );
+    }
+
+    unsigned int instanceIndex = model->instanceCount++;
+
+    model->instances[instanceIndex].position[0] = position->x;
+    model->instances[instanceIndex].position[1] = position->y;
+    model->instances[instanceIndex].position[2] = position->z;
+
+    model->instances[instanceIndex].rotation[0] = rotation->x;
+    model->instances[instanceIndex].rotation[1] = rotation->y;
+    model->instances[instanceIndex].rotation[2] = rotation->z;
+
+    model->instances[instanceIndex].scale = scale;
+
+    glBindBuffer(GL_ARRAY_BUFFER, model->instanceVBO);
+
+    glBufferSubData(
+        GL_ARRAY_BUFFER,
+        instanceIndex * sizeof(AnimatedModelInstance),
+        sizeof(AnimatedModelInstance),
+        &model->instances[instanceIndex]
+    );
+}
+
+
+
 void initModelManager() {
     modelManager.amtModels = 0;
     modelManager.capacity = 2;
@@ -1124,11 +1202,15 @@ void initModelManager() {
     glBindAttribLocation(animatedModelShader, 3, "layer"); // texture index
     glBindAttribLocation(animatedModelShader, 4, "boneIds");
     glBindAttribLocation(animatedModelShader, 5, "boneWeights");
+    glBindAttribLocation(animatedModelShader, 6, "instancePosition");
+    glBindAttribLocation(animatedModelShader, 7, "instanceRotation");
+    glBindAttribLocation(animatedModelShader, 8, "instanceScale");
     glLinkProgram(animatedModelShader);
 
 
 
-    initAnimatedModel("assets/OBJ/CesiumMan.gltf");
+    int cesiumManAnimatedModelIndex = initAnimatedModel("assets/OBJ/CesiumMan.gltf");
+    int clericManAnimatedModelIndex = initAnimatedModel("assets/OBJ/Cleric.gltf");
     // exit(5);
 
     // int treeModelIndex = initModel("assets/OBJ/CommonTree_1.obj");
@@ -1144,6 +1226,29 @@ void initModelManager() {
     //     createModelInstance(&modelManager.models[mushroomModelIndex], &(Vec3){27.0f-i*5, 60.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, 1.0f);
     // }
 
+
+
+    AnimatedModel *man = &modelManager.animatedModels[cesiumManAnimatedModelIndex];
+
+    for (int i = 0; i < 10; i++) {
+        createAnimatedModelInstance(
+            man,
+            &(Vec3){i * 2.0f, 0.0f, 0.0f},
+            &(Vec3){90.0f, 0.0f, 0.0f},
+            1.0f
+        );
+    }
+    
+    AnimatedModel *cleric = &modelManager.animatedModels[clericManAnimatedModelIndex];
+
+    for (int i = 0; i < 10; i++) {
+        createAnimatedModelInstance(
+            cleric,
+            &(Vec3){i * 2.0f, 0.0f, 5.0f},
+            &(Vec3){90.0f, 0.0f, 0.0f},
+            1.0f
+        );
+    }
 
 }
 
@@ -2598,13 +2703,12 @@ void renderAnimatedModel(AnimatedModel *model) {
     glUniform3f(glGetUniformLocation(animatedModelShader, "viewPos"), eyeX, eyeY, eyeZ);
 
     glBindVertexArray(model->vao);
-    
-
-    glDrawElements(
+    glDrawElementsInstanced(
         GL_TRIANGLES,
         model->indexCount,
         GL_UNSIGNED_INT,
-        0
+        0,
+        model->instanceCount
     );
 
     glBindVertexArray(0);
@@ -2734,6 +2838,9 @@ void drawGraphics()
     
     updateAnimation(&modelManager.animatedModels[0], 0, DELTA_TIME);  
     renderAnimatedModel(&modelManager.animatedModels[0]);
+
+    updateAnimation(&modelManager.animatedModels[1], 10, DELTA_TIME);  
+    renderAnimatedModel(&modelManager.animatedModels[1]);
     // for (unsigned int i = 0; i < modelManager.amtModels; i++) {
     //     renderModel(&modelManager.models[i]);
     // }

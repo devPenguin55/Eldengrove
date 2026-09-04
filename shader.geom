@@ -69,7 +69,6 @@ void main()
     } else if (distance(playerPosition, geomIn[0].worldPos) > 20) {
         return;
     }
-    
     float playerDistance =
     distance(playerPosition, geomIn[0].worldPos);
 
