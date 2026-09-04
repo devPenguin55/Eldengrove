@@ -151,10 +151,20 @@ typedef struct Animation {
     unsigned int channelCount;
 } Animation;
 
-typedef struct {
+
+typedef struct AnimatedModelInstanceData {
     float position[3];
     float rotation[3];
     float scale;
+} AnimatedModelInstanceData;
+
+typedef struct AnimatedModelInstance {
+    AnimatedModelInstanceData transform;
+
+    unsigned int animationIndex;
+    float animationTime;
+
+    Mat4 *finalBoneMatrices;
 } AnimatedModelInstance;
 
 typedef struct AnimatedModel {
@@ -165,14 +175,14 @@ typedef struct AnimatedModel {
     GLuint textureArray;
     unsigned int indexCount;
 
+    GLuint boneMatrixBuffer;
+    GLuint boneMatrixTexture;
+    
     BoneInfo *bones;
     unsigned int boneCount;
 
     Animation *animations;
     unsigned int animationCount;
-    
-    Mat4 *finalBoneMatrices;
-    GLint boneMatrixLocation;
 
     ModelNode *rootNode;
     Mat4 globalInverseTransform;

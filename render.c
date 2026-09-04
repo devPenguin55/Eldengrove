@@ -780,22 +780,46 @@ int initAnimatedModel(const char *objPath) {
     glGenVertexArrays(1, &currentModel->vao);
     glGenBuffers(1, &currentModel->vbo);
     glGenBuffers(1, &currentModel->ebo);
-
     glGenBuffers(1, &currentModel->instanceVBO);
+
     currentModel->instanceCapacity = 16;
     currentModel->instanceCount = 0;
     currentModel->instances = malloc(
         sizeof(AnimatedModelInstance) * currentModel->instanceCapacity
     );
 
+    glGenBuffers(1, &currentModel->boneMatrixBuffer);
+
+    glBindBuffer(GL_TEXTURE_BUFFER, currentModel->boneMatrixBuffer);
+
+    glBufferData(
+        GL_TEXTURE_BUFFER,
+        currentModel->instanceCapacity *
+            currentModel->boneCount *
+            sizeof(Mat4),
+        NULL,
+        GL_DYNAMIC_DRAW
+    );
+
+    glGenTextures(1, &currentModel->boneMatrixTexture);
+
+    glBindTexture(GL_TEXTURE_BUFFER, currentModel->boneMatrixTexture);
+
+    glTexBuffer(
+        GL_TEXTURE_BUFFER,
+        GL_RGBA32F,
+        currentModel->boneMatrixBuffer
+    );
+
+    glBindTexture(GL_TEXTURE_BUFFER, 0);
+    glBindBuffer(GL_TEXTURE_BUFFER, 0);
+
+   
+
     glBindVertexArray(currentModel->vao);
 
     glBindBuffer(GL_ARRAY_BUFFER, currentModel->vbo);
-    currentModel->boneMatrixLocation = glGetUniformLocation(animatedModelShader, "finalBonesMatrices");  
-    currentModel->finalBoneMatrices = malloc(sizeof(Mat4) * currentModel->boneCount);  
-    for (unsigned int i = 0; i < currentModel->boneCount; i++) {  
-        currentModel->finalBoneMatrices[i] = mat4Identity();  
-    }
+
     glBufferData(GL_ARRAY_BUFFER, totalModelVertices * sizeof(AnimatedModelVertex), modelVertices, GL_STATIC_DRAW);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, currentModel->ebo);
@@ -823,7 +847,8 @@ int initAnimatedModel(const char *objPath) {
 
     glBufferData(
         GL_ARRAY_BUFFER,
-        sizeof(AnimatedModelInstance) * currentModel->instanceCapacity,
+        sizeof(AnimatedModelInstanceData) *
+            currentModel->instanceCapacity,
         NULL,
         GL_DYNAMIC_DRAW
     );
@@ -833,8 +858,8 @@ int initAnimatedModel(const char *objPath) {
         3,
         GL_FLOAT,
         GL_FALSE,
-        sizeof(AnimatedModelInstance),
-        (void *)offsetof(AnimatedModelInstance, position)
+        sizeof(AnimatedModelInstanceData),
+        (void *)offsetof(AnimatedModelInstanceData, position)
     );
     glEnableVertexAttribArray(6);
     glVertexAttribDivisor(6, 1);
@@ -844,8 +869,8 @@ int initAnimatedModel(const char *objPath) {
         3,
         GL_FLOAT,
         GL_FALSE,
-        sizeof(AnimatedModelInstance),
-        (void *)offsetof(AnimatedModelInstance, rotation)
+        sizeof(AnimatedModelInstanceData),
+        (void *)offsetof(AnimatedModelInstanceData, rotation)
     );
     glEnableVertexAttribArray(7);
     glVertexAttribDivisor(7, 1);
@@ -855,8 +880,8 @@ int initAnimatedModel(const char *objPath) {
         1,
         GL_FLOAT,
         GL_FALSE,
-        sizeof(AnimatedModelInstance),
-        (void *)offsetof(AnimatedModelInstance, scale)
+        sizeof(AnimatedModelInstanceData),
+        (void *)offsetof(AnimatedModelInstanceData, scale)
     );
     glEnableVertexAttribArray(8);
     glVertexAttribDivisor(8, 1);
@@ -996,59 +1021,92 @@ Vec3 interpolateScale(AnimationChannel *channel, double time) {
     return channel->scaleKeys[channel->scaleKeyCount - 1].value;  
 }  
   
-void updateBoneHierarchy(  
-    AnimatedModel *model,  
-    ModelNode *node,  
-    Animation *anim,  
-    double animationTime,  
-    Mat4 parentTransform  
-) {  
-    Mat4 nodeTransform = node->transformation; 
-  
-    AnimationChannel *channel = findChannel(anim, node->name);  
+void updateBoneHierarchy(
+    AnimatedModel *model,
+    AnimatedModelInstance *instance,
+    ModelNode *node,
+    Animation *anim,
+    double animationTime,
+    Mat4 parentTransform
+) {
+    Mat4 nodeTransform = node->transformation;
+
+    AnimationChannel *channel = findChannel(anim, node->name);
+
     if (channel != NULL && node->parent != NULL) {
-        Vec3 pos = interpolatePosition(channel, animationTime);  
-        Quat rot = interpolateRotation(channel, animationTime);  
-        Vec3 scale = interpolateScale(channel, animationTime);  
-  
-        Mat4 translation = mat4Translate(pos);  
-        Mat4 rotation = mat4FromQuat(rot);  
-        Mat4 scaling = mat4Scale(scale);  
-  
-        nodeTransform = mat4Multiply(translation, mat4Multiply(rotation, scaling));  
-    }  
-  
-    Mat4 globalTransform = mat4Multiply(parentTransform, nodeTransform);  
-  
-    for (unsigned int i = 0; i < model->boneCount; i++) {  
-        if (strcmp(model->bones[i].name, node->name) == 0) {  
-            model->finalBoneMatrices[i] = mat4Multiply(
-                model->globalInverseTransform,
-                mat4Multiply(globalTransform, model->bones[i].offsetMatrix)
-            );
-            break;  
-        }  
-    }  
-  
-    for (unsigned int i = 0; i < node->childCount; i++) {  
-        updateBoneHierarchy(model, node->children[i], anim, animationTime, globalTransform);  
-    }  
-}  
-  
-void updateAnimation(AnimatedModel *model, int animationIndex, double deltaTime) {  
-    if (model->animationCount == 0 || model->rootNode == NULL) return;  
-  
-    Animation *anim = &model->animations[animationIndex];  
-  
-    static double currentTime = 0.0;  
-    currentTime += deltaTime * anim->ticksPerSecond;  
-    currentTime = fmod(currentTime, anim->duration);  
-  
-    updateBoneHierarchy(model, model->rootNode, anim, currentTime, mat4Identity());  
+        Vec3 pos = interpolatePosition(channel, animationTime);
+        Quat rot = interpolateRotation(channel, animationTime);
+        Vec3 scale = interpolateScale(channel, animationTime);
+
+        Mat4 translation = mat4Translate(pos);
+        Mat4 rotation = mat4FromQuat(rot);
+        Mat4 scaling = mat4Scale(scale);
+
+        nodeTransform = mat4Multiply(
+            translation,
+            mat4Multiply(rotation, scaling)
+        );
+    }
+
+    Mat4 globalTransform =
+        mat4Multiply(parentTransform, nodeTransform);
+
+    for (unsigned int i = 0; i < model->boneCount; i++) {
+        if (strcmp(model->bones[i].name, node->name) == 0) {
+            instance->finalBoneMatrices[i] =
+                mat4Multiply(
+                    model->globalInverseTransform,
+                    mat4Multiply(
+                        globalTransform,
+                        model->bones[i].offsetMatrix
+                    )
+                );
+            break;
+        }
+    }
+
+    for (unsigned int i = 0; i < node->childCount; i++) {
+        updateBoneHierarchy(
+            model,
+            instance,
+            node->children[i],
+            anim,
+            animationTime,
+            globalTransform
+        );
+    }
 }
 
+void updateAnimation(
+    AnimatedModel *model,
+    AnimatedModelInstance *instance,
+    double deltaTime
+) {
+    if (model->animationCount == 0 ||
+        model->rootNode == NULL)
+        return;
 
+    if (instance->animationIndex >= model->animationCount)
+        return;
 
+    Animation *anim =
+        &model->animations[instance->animationIndex];
+
+    instance->animationTime +=
+        deltaTime * anim->ticksPerSecond;
+
+    instance->animationTime =
+        fmod(instance->animationTime, anim->duration);
+
+    updateBoneHierarchy(
+        model,
+        instance,
+        model->rootNode,
+        anim,
+        instance->animationTime,
+        mat4Identity()
+    );
+}
 
 void createModelInstance(Model *model, Vec3 *position, Vec3 *rotation, float scale) {
     if (model->instanceCount >= model->instanceCapacity) {
@@ -1118,7 +1176,8 @@ void createAnimatedModelInstance(
     AnimatedModel *model,
     Vec3 *position,
     Vec3 *rotation,
-    float scale
+    float scale,
+    unsigned int animationIndex
 ) {
     if (model->instanceCount >= model->instanceCapacity) {
         model->instanceCapacity *= 2;
@@ -1132,35 +1191,126 @@ void createAnimatedModelInstance(
 
         glBufferData(
             GL_ARRAY_BUFFER,
-            sizeof(AnimatedModelInstance) * model->instanceCapacity,
+            sizeof(AnimatedModelInstanceData) * model->instanceCapacity,
             NULL,
             GL_DYNAMIC_DRAW
         );
+
+        for (unsigned int i = 0; i < model->instanceCount; i++) {
+            glBufferSubData(
+                GL_ARRAY_BUFFER,
+                i * sizeof(AnimatedModelInstanceData),
+                sizeof(AnimatedModelInstanceData),
+                &model->instances[i].transform
+            );
+        }
+
+        glBindBuffer(GL_TEXTURE_BUFFER, model->boneMatrixBuffer);
+
+        glBufferData(
+            GL_TEXTURE_BUFFER,
+            sizeof(Mat4) *
+                model->instanceCapacity *
+                model->boneCount,
+            NULL,
+            GL_DYNAMIC_DRAW
+        );
+
+        glBindBuffer(GL_TEXTURE_BUFFER, 0);
+    }
+
+    if (animationIndex >= model->animationCount) {
+        return;
     }
 
     unsigned int instanceIndex = model->instanceCount++;
 
-    model->instances[instanceIndex].position[0] = position->x;
-    model->instances[instanceIndex].position[1] = position->y;
-    model->instances[instanceIndex].position[2] = position->z;
+    model->instances[instanceIndex].transform.position[0] = position->x;
+    model->instances[instanceIndex].transform.position[1] = position->y;
+    model->instances[instanceIndex].transform.position[2] = position->z;
 
-    model->instances[instanceIndex].rotation[0] = rotation->x;
-    model->instances[instanceIndex].rotation[1] = rotation->y;
-    model->instances[instanceIndex].rotation[2] = rotation->z;
+    model->instances[instanceIndex].transform.rotation[0] = rotation->x;
+    model->instances[instanceIndex].transform.rotation[1] = rotation->y;
+    model->instances[instanceIndex].transform.rotation[2] = rotation->z;
 
-    model->instances[instanceIndex].scale = scale;
+    model->instances[instanceIndex].transform.scale = scale;
+
+    model->instances[instanceIndex].animationIndex = animationIndex;
+    model->instances[instanceIndex].animationTime = 200.0f * instanceIndex;
+    model->instances[instanceIndex].finalBoneMatrices = malloc(sizeof(Mat4) * model->boneCount);
+    for (unsigned int i = 0; i < model->boneCount; i++) {
+        model->instances[instanceIndex].finalBoneMatrices[i] = mat4Identity();
+    }
 
     glBindBuffer(GL_ARRAY_BUFFER, model->instanceVBO);
 
     glBufferSubData(
         GL_ARRAY_BUFFER,
-        instanceIndex * sizeof(AnimatedModelInstance),
-        sizeof(AnimatedModelInstance),
-        &model->instances[instanceIndex]
+        instanceIndex * sizeof(AnimatedModelInstanceData),
+        sizeof(AnimatedModelInstanceData),
+        &model->instances[instanceIndex].transform
+    );
+}
+
+void updateAnimatedModelInstance(
+    AnimatedModel *model,
+    AnimatedModelInstance *instance,
+    float deltaTime
+) {
+    if (instance->animationIndex >= model->animationCount)
+        return;
+
+    Animation *animation =
+        &model->animations[instance->animationIndex];
+
+    instance->animationTime +=
+        deltaTime * animation->ticksPerSecond;
+
+    if (animation->duration > 0.0)
+        instance->animationTime =
+            fmod(
+                instance->animationTime,
+                animation->duration
+            );
+
+    updateBoneHierarchy(
+        model,
+        instance,
+        model->rootNode,
+        animation,
+        instance->animationTime,
+        mat4Identity()
     );
 }
 
 
+void uploadBoneMatrices(AnimatedModel *model)
+{
+    glBindBuffer(GL_TEXTURE_BUFFER, model->boneMatrixBuffer);
+
+    for (unsigned int i = 0; i < model->instanceCount; i++) {
+        glBufferSubData(
+            GL_TEXTURE_BUFFER,
+            i * model->boneCount * sizeof(Mat4),
+            model->boneCount * sizeof(Mat4),
+            model->instances[i].finalBoneMatrices
+        );
+    }
+
+    glBindBuffer(GL_TEXTURE_BUFFER, 0);
+}
+
+void setAnimatedModelInstanceAnimation(
+    AnimatedModel *model,
+    AnimatedModelInstance *instance,
+    unsigned int animationIndex
+) {
+    if (animationIndex >= model->animationCount)
+        return;
+
+    instance->animationIndex = animationIndex;
+    instance->animationTime = 0.0f;
+}
 
 void initModelManager() {
     modelManager.amtModels = 0;
@@ -1209,8 +1359,8 @@ void initModelManager() {
 
 
 
-    int cesiumManAnimatedModelIndex = initAnimatedModel("assets/OBJ/CesiumMan.gltf");
     int clericManAnimatedModelIndex = initAnimatedModel("assets/OBJ/Cleric.gltf");
+    int cesiumManAnimatedModelIndex = initAnimatedModel("assets/OBJ/CesiumMan.gltf");
     // exit(5);
 
     // int treeModelIndex = initModel("assets/OBJ/CommonTree_1.obj");
@@ -1228,25 +1378,25 @@ void initModelManager() {
 
 
 
-    AnimatedModel *man = &modelManager.animatedModels[cesiumManAnimatedModelIndex];
-
-    for (int i = 0; i < 10; i++) {
-        createAnimatedModelInstance(
-            man,
-            &(Vec3){i * 2.0f, 0.0f, 0.0f},
-            &(Vec3){90.0f, 0.0f, 0.0f},
-            1.0f
-        );
-    }
-    
     AnimatedModel *cleric = &modelManager.animatedModels[clericManAnimatedModelIndex];
+    AnimatedModel *cesium = &modelManager.animatedModels[cesiumManAnimatedModelIndex];
+
 
     for (int i = 0; i < 10; i++) {
         createAnimatedModelInstance(
             cleric,
-            &(Vec3){i * 2.0f, 0.0f, 5.0f},
-            &(Vec3){90.0f, 0.0f, 0.0f},
-            1.0f
+            &(Vec3){i * 2.0f, 0.0f, 0.0f},
+            &(Vec3){i*15.0f, i*5.0f, i*5.0f},
+            1.0f - i*0.1f,
+            i
+        );
+
+        createAnimatedModelInstance(
+            cesium,
+            &(Vec3){i * 2.0f, 0.0f, 2.0f},
+            &(Vec3){i*-15.0f, i*-5.0f, i*-5.0f},
+            2.0f - i*0.1f,
+            0
         );
     }
 
@@ -1332,6 +1482,10 @@ void initGraphics()
         GL_R8UI,
         lightBuffer
     );
+
+
+
+    
 
 
     const char *blockTextures[] = {
@@ -2688,21 +2842,39 @@ void renderModel(Model *model) {
 void renderAnimatedModel(AnimatedModel *model) {
     glUseProgram(animatedModelShader);
 
-    glUniformMatrix4fv(
-        model->boneMatrixLocation,
-        model->boneCount,
-        GL_TRUE,
-        (float*)model->finalBoneMatrices 
-    );
-
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D_ARRAY, model->textureArray);
 
-    glUniform1i(glGetUniformLocation(animatedModelShader, "modelTextures"), 0);
-    glUniform3f(glGetUniformLocation(animatedModelShader, "lightPos"), 0.0f, 100.0, 0.0f);  
-    glUniform3f(glGetUniformLocation(animatedModelShader, "viewPos"), eyeX, eyeY, eyeZ);
+    glUniform1i(
+        glGetUniformLocation(animatedModelShader, "modelTextures"),
+        0
+    );
+
+    glUniform1i(
+        glGetUniformLocation(animatedModelShader, "boneCount"),
+        model->boneCount
+    );
+
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_BUFFER, model->boneMatrixTexture);
+
+    glUniform1i(
+        glGetUniformLocation(animatedModelShader, "boneMatrices"),
+        1
+    );
+
+    glUniform3f(
+        glGetUniformLocation(animatedModelShader, "lightPos"),
+        0.0f, 100.0f, 0.0f
+    );
+
+    glUniform3f(
+        glGetUniformLocation(animatedModelShader, "viewPos"),
+        eyeX, eyeY, eyeZ
+    );
 
     glBindVertexArray(model->vao);
+
     glDrawElementsInstanced(
         GL_TRIANGLES,
         model->indexCount,
@@ -2835,12 +3007,31 @@ void drawGraphics()
         }
     }
 
-    
-    updateAnimation(&modelManager.animatedModels[0], 0, DELTA_TIME);  
-    renderAnimatedModel(&modelManager.animatedModels[0]);
+    AnimatedModel *model = &modelManager.animatedModels[0];
 
-    updateAnimation(&modelManager.animatedModels[1], 10, DELTA_TIME);  
-    renderAnimatedModel(&modelManager.animatedModels[1]);
+    for (unsigned int i = 0; i < model->instanceCount; i++)
+        updateAnimatedModelInstance(
+            model,
+            &model->instances[i],
+            DELTA_TIME
+        );
+
+    uploadBoneMatrices(model);
+    renderAnimatedModel(model);
+
+
+    AnimatedModel *model2 = &modelManager.animatedModels[1];
+
+    for (unsigned int i = 0; i < model2->instanceCount; i++)
+        updateAnimatedModelInstance(
+            model2,
+            &model2->instances[i],
+            DELTA_TIME
+        );
+
+    uploadBoneMatrices(model2);
+    renderAnimatedModel(model2);
+
     // for (unsigned int i = 0; i < modelManager.amtModels; i++) {
     //     renderModel(&modelManager.models[i]);
     // }
