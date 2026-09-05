@@ -1252,11 +1252,13 @@ void createAnimatedModelInstance(
     );
 }
 
-void updateAnimatedModelInstance(
+void updateAnimatedModelInstanceAnimationOnly(
     AnimatedModel *model,
-    AnimatedModelInstance *instance,
+    int instanceIndex,
     float deltaTime
 ) {
+    AnimatedModelInstance *instance = &model->instances[instanceIndex];
+
     if (instance->animationIndex >= model->animationCount)
         return;
 
@@ -1264,8 +1266,8 @@ void updateAnimatedModelInstance(
         &model->animations[instance->animationIndex];
 
     instance->animationTime +=
-        deltaTime * animation->ticksPerSecond;
-
+        deltaTime * animation->ticksPerSecond;   
+      
     if (animation->duration > 0.0)
         instance->animationTime =
             fmod(
@@ -1280,6 +1282,42 @@ void updateAnimatedModelInstance(
         animation,
         instance->animationTime,
         mat4Identity()
+    );
+}
+
+void updateAnimatedModelInstanceTransformOnly(
+    AnimatedModel *model,
+    int instanceIndex,
+    Vec3 *newPosition, 
+    Vec3 *newRotation, 
+    float newScale
+) {
+    
+    if (instanceIndex < 0 ||
+        instanceIndex >= model->instanceCount) {
+            printf("Invalid model instance index: %d\n", instanceIndex);
+            return;
+        }
+        
+    AnimatedModelInstanceData *transform = &model->instances[instanceIndex].transform;
+
+    transform->position[0] = newPosition->x;
+    transform->position[1] = newPosition->y;
+    transform->position[2] = newPosition->z;
+
+    transform->rotation[0] = newRotation->x;
+    transform->rotation[1] = newRotation->y;
+    transform->rotation[2] = newRotation->z;
+
+    transform->scale = newScale;
+
+    glBindBuffer(GL_ARRAY_BUFFER, model->instanceVBO);
+
+    glBufferSubData(
+        GL_ARRAY_BUFFER,
+        instanceIndex * sizeof(ModelInstance),
+        sizeof(ModelInstance),
+        &model->instances[instanceIndex]
     );
 }
 
@@ -3008,24 +3046,30 @@ void drawGraphics()
     }
 
     AnimatedModel *model = &modelManager.animatedModels[0];
-
-    for (unsigned int i = 0; i < model->instanceCount; i++)
-        updateAnimatedModelInstance(
+    for (unsigned int i = 0; i < model->instanceCount; i++) {
+        updateAnimatedModelInstanceAnimationOnly(
             model,
-            &model->instances[i],
+            i,
             DELTA_TIME
         );
+        updateAnimatedModelInstanceTransformOnly(
+            model,
+            i,
+            &(Vec3){model->instances[i].transform.position[0],model->instances[i].transform.position[1],model->instances[i].transform.position[2]},
+            &(Vec3){model->instances[i].transform.rotation[0],model->instances[i].transform.rotation[1]+1.0f,model->instances[i].transform.rotation[2]},
+            model->instances[i].transform.scale
+        );
+    }
 
     uploadBoneMatrices(model);
     renderAnimatedModel(model);
 
 
     AnimatedModel *model2 = &modelManager.animatedModels[1];
-
     for (unsigned int i = 0; i < model2->instanceCount; i++)
-        updateAnimatedModelInstance(
+        updateAnimatedModelInstanceAnimationOnly(
             model2,
-            &model2->instances[i],
+            i,
             DELTA_TIME
         );
 

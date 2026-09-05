@@ -247,6 +247,27 @@ void cubeFace(GLfloat Vertices[8][3], GLfloat transformation[3], GLfloat size[2]
 void drawText(const char *text, float x, float y);
 void drawGraphics();
 void checkForWorldChunkVerticesDeletion();
+void createModelInstance(Model *model, Vec3 *position, Vec3 *rotation, float scale);
+void updateModelInstance(Model *model, int instanceIndex, Vec3 *newPosition, Vec3 *newRotation, float newScale);
+void createAnimatedModelInstance(
+    AnimatedModel *model,
+    Vec3 *position,
+    Vec3 *rotation,
+    float scale,
+    unsigned int animationIndex
+);
+void updateAnimatedModelInstanceAnimationOnly(
+    AnimatedModel *model,
+    int instanceIndex,
+    float deltaTime
+);
+void updateAnimatedModelInstanceTransformOnly(
+    AnimatedModel *model,
+    int instanceIndex,
+    Vec3 *newPosition, 
+    Vec3 *newRotation, 
+    float newScale
+);
 void buildWorldMesh();
 void uploadWorldMesh();
 

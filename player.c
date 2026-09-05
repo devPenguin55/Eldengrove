@@ -196,6 +196,9 @@ int playerCollides(Player* player) {
 void updatePlayerPhysics(Player* player)
 {
     float gravity = (player->isInWater) ? (5.0f) : (20.0f);
+    if (player->isOnGround == -1) {
+        gravity = 0.0f;
+    }
     // gravity = 0.0;
     int slopeDirCur = slopeDir(player);
     player->velocity.y -= gravity * DELTA_TIME;
