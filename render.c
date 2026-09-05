@@ -19,6 +19,7 @@
 #include "player.h"
 #include "worldDiskStorage.h"
 #include "vectors.h"
+#include "entitySystem.h"
 
 GLfloat T = 0;
 
@@ -961,6 +962,44 @@ int initAnimatedModel(const char *objPath) {
         mat4FromAiMatrix4x4(assimpScene->mRootNode->mTransformation)
     );
 
+    Vec3 min = {
+        99999,
+        99999,
+        99999
+    };
+
+    Vec3 max = {
+        -99999,
+        -99999,
+        -99999
+    };
+
+    for (unsigned int m = 0; m < assimpScene->mNumMeshes; m++) {
+        struct aiMesh *mesh = assimpScene->mMeshes[m];
+
+        for (unsigned int v = 0; v < mesh->mNumVertices; v++) {
+            struct aiVector3D p = mesh->mVertices[v];
+
+            min.x = fminf(min.x, p.x);
+            min.y = fminf(min.y, p.y);
+            min.z = fminf(min.z, p.z);
+
+            max.x = fmaxf(max.x, p.x);
+            max.y = fmaxf(max.y, p.y);
+            max.z = fmaxf(max.z, p.z);
+        }
+    }
+
+    printf("dimensions: %f x %f x %f\n",
+        max.x - min.x,
+        max.y - min.y,
+        max.z - min.z
+    );
+
+    currentModel->dimensions.x = max.x - min.x;
+    currentModel->dimensions.z = max.y - min.y; // since y is up here (diff coord system for me)
+    currentModel->dimensions.y = max.z - min.z;
+
     
     aiReleaseImport(assimpScene);
 
@@ -1108,7 +1147,7 @@ void updateAnimation(
     );
 }
 
-void createModelInstance(Model *model, Vec3 *position, Vec3 *rotation, float scale) {
+int createModelInstance(Model *model, Vec3 *position, Vec3 *rotation, float scale) {
     if (model->instanceCount >= model->instanceCapacity) {
         model->instanceCapacity *= 2;
         model->instances = realloc(model->instances, sizeof(ModelInstance) * model->instanceCapacity);
@@ -1143,6 +1182,8 @@ void createModelInstance(Model *model, Vec3 *position, Vec3 *rotation, float sca
         sizeof(ModelInstance),
         &model->instances[instanceIndex]
     );
+
+    return instanceIndex;
 }
 
 void updateModelInstance(Model *model, int instanceIndex, Vec3 *newPosition, Vec3 *newRotation, float newScale) {
@@ -1172,7 +1213,7 @@ void updateModelInstance(Model *model, int instanceIndex, Vec3 *newPosition, Vec
     );
 }
 
-void createAnimatedModelInstance(
+int createAnimatedModelInstance(
     AnimatedModel *model,
     Vec3 *position,
     Vec3 *rotation,
@@ -1220,7 +1261,7 @@ void createAnimatedModelInstance(
     }
 
     if (animationIndex >= model->animationCount) {
-        return;
+        return -1;
     }
 
     unsigned int instanceIndex = model->instanceCount++;
@@ -1236,7 +1277,7 @@ void createAnimatedModelInstance(
     model->instances[instanceIndex].transform.scale = scale;
 
     model->instances[instanceIndex].animationIndex = animationIndex;
-    model->instances[instanceIndex].animationTime = 200.0f * instanceIndex;
+    model->instances[instanceIndex].animationTime = 0.0f;
     model->instances[instanceIndex].finalBoneMatrices = malloc(sizeof(Mat4) * model->boneCount);
     for (unsigned int i = 0; i < model->boneCount; i++) {
         model->instances[instanceIndex].finalBoneMatrices[i] = mat4Identity();
@@ -1250,6 +1291,8 @@ void createAnimatedModelInstance(
         sizeof(AnimatedModelInstanceData),
         &model->instances[instanceIndex].transform
     );
+
+    return instanceIndex;
 }
 
 void updateAnimatedModelInstanceAnimationOnly(
@@ -1398,7 +1441,7 @@ void initModelManager() {
 
 
     int clericManAnimatedModelIndex = initAnimatedModel("assets/OBJ/Cleric.gltf");
-    int cesiumManAnimatedModelIndex = initAnimatedModel("assets/OBJ/CesiumMan.gltf");
+
     // exit(5);
 
     // int treeModelIndex = initModel("assets/OBJ/CommonTree_1.obj");
@@ -1414,29 +1457,9 @@ void initModelManager() {
     //     createModelInstance(&modelManager.models[mushroomModelIndex], &(Vec3){27.0f-i*5, 60.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, 1.0f);
     // }
 
+    initEntitySystem();
 
-
-    AnimatedModel *cleric = &modelManager.animatedModels[clericManAnimatedModelIndex];
-    AnimatedModel *cesium = &modelManager.animatedModels[cesiumManAnimatedModelIndex];
-
-
-    for (int i = 0; i < 10; i++) {
-        createAnimatedModelInstance(
-            cleric,
-            &(Vec3){i * 2.0f +33.0f, 0.0f +60.0f, 0.0f},
-            &(Vec3){i*15.0f, i*5.0f, i*5.0f},
-            1.0f - i*0.1f,
-            i
-        );
-
-        createAnimatedModelInstance(
-            cesium,
-            &(Vec3){i * 2.0f +33.0f, 0.0f+60.0f, 2.0f},
-            &(Vec3){i*-15.0f, i*-5.0f, i*-5.0f},
-            2.0f - i*0.1f,
-            0
-        );
-    }
+    createEntity(ANIMATED_MODEL_INDEX_CLERIC, 10, &(Vec3){33.0f, 60.0f, 0.0f}, &(Vec3){-1.0f, 0.0f, 0.0f}, &(Vec3){0.0f, 90.0f, 0.0f}, 1.0f);
 
 }
 
@@ -3045,36 +3068,7 @@ void drawGraphics()
         }
     }
 
-    AnimatedModel *model = &modelManager.animatedModels[0];
-    for (unsigned int i = 0; i < model->instanceCount; i++) {
-        updateAnimatedModelInstanceAnimationOnly(
-            model,
-            i,
-            DELTA_TIME
-        );
-        updateAnimatedModelInstanceTransformOnly(
-            model,
-            i,
-            &(Vec3){model->instances[i].transform.position[0],model->instances[i].transform.position[1],model->instances[i].transform.position[2]},
-            &(Vec3){model->instances[i].transform.rotation[0],model->instances[i].transform.rotation[1]+1.0f,model->instances[i].transform.rotation[2]},
-            model->instances[i].transform.scale
-        );
-    }
-
-    uploadBoneMatrices(model);
-    renderAnimatedModel(model);
-
-
-    AnimatedModel *model2 = &modelManager.animatedModels[1];
-    for (unsigned int i = 0; i < model2->instanceCount; i++)
-        updateAnimatedModelInstanceAnimationOnly(
-            model2,
-            i,
-            DELTA_TIME
-        );
-
-    uploadBoneMatrices(model2);
-    renderAnimatedModel(model2);
+    
 
     // for (unsigned int i = 0; i < modelManager.amtModels; i++) {
     //     renderModel(&modelManager.models[i]);
@@ -3082,7 +3076,7 @@ void drawGraphics()
     // updateModelInstance(&modelManager.models[0], 0, &(Vec3){33.0f, 60.0f, 0.0f}, &(Vec3){currentTime, 0.0f, 0.0f}, 1.0f);
     // updateModelInstance(&modelManager.models[0], 1, &(Vec3){27.0f, 60.0f, 0.0f}, &(Vec3){0.0f, currentTime, 0.0f}, 1.0f);
     // updateModelInstance(&modelManager.models[1], 0, &(Vec3){39.0f, 60.0f, 0.0f}, &(Vec3){0.0f, 0.0f, currentTime}, 1.0f);
-    
+    worldEntityUpdate();
 
     buildWorldMesh(); // fills worldVertices and worldVertexCount
 

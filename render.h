@@ -191,6 +191,8 @@ typedef struct AnimatedModel {
     AnimatedModelInstance *instances;
     unsigned int instanceCount;
     unsigned int instanceCapacity;
+
+    Vec3 dimensions;
 } AnimatedModel;
 
 typedef struct ModelManager {
@@ -247,9 +249,9 @@ void cubeFace(GLfloat Vertices[8][3], GLfloat transformation[3], GLfloat size[2]
 void drawText(const char *text, float x, float y);
 void drawGraphics();
 void checkForWorldChunkVerticesDeletion();
-void createModelInstance(Model *model, Vec3 *position, Vec3 *rotation, float scale);
+int createModelInstance(Model *model, Vec3 *position, Vec3 *rotation, float scale);
 void updateModelInstance(Model *model, int instanceIndex, Vec3 *newPosition, Vec3 *newRotation, float newScale);
-void createAnimatedModelInstance(
+int createAnimatedModelInstance(
     AnimatedModel *model,
     Vec3 *position,
     Vec3 *rotation,
@@ -268,6 +270,8 @@ void updateAnimatedModelInstanceTransformOnly(
     Vec3 *newRotation, 
     float newScale
 );
+void uploadBoneMatrices(AnimatedModel *model);
+void renderAnimatedModel(AnimatedModel *model);
 void buildWorldMesh();
 void uploadWorldMesh();
 
