@@ -4,6 +4,8 @@
 #include "chunks.h"
 #include "chunkLoaderManager.h"
 #include "input.h"
+#include "entitySystem.h"
+#include "render.h"
 
 Chunk *chunkAtPosition(int voxelX, int voxelY, int voxelZ) {
     int playerChunkX = (int)floor(player.position.x / (ChunkWidthX * BlockWidthX));
@@ -84,10 +86,38 @@ int isSolidVoxel(int voxelX, int voxelY, int voxelZ)
     );
 }
 
-float playerHalfWidth(Player* player)
+float playerHalfWidth(Player *player)
 {
     // return 0;
     return player->width * 0.5f;
+}
+
+float entityHalfWidthX(Entity *entity)
+{
+    Vec3 dimensions = modelManager.animatedModels[entity->animatedModelIndex].dimensions;
+
+    float halfX = dimensions.x * 0.5f;
+    float halfZ = dimensions.z * 0.5f;
+    float angle = radians(entity->rotation.y);
+
+    return entity->size * (
+        fabsf(cosf(angle)) * halfX +
+        fabsf(sinf(angle)) * halfZ
+    );
+}
+
+float entityHalfWidthZ(Entity *entity)
+{
+    Vec3 dimensions = modelManager.animatedModels[entity->animatedModelIndex].dimensions;
+
+    float halfX = dimensions.x * 0.5f;
+    float halfZ = dimensions.z * 0.5f;
+    float angle = radians(entity->rotation.y);
+
+    return entity->size * (
+        fabsf(sinf(angle)) * halfX +
+        fabsf(cosf(angle)) * halfZ
+    );
 }
 
 float getSlopeHeight(Block* block, float x, float z)
@@ -141,31 +171,7 @@ int playerCollides(Player* player) {
                     if (block->isSlope) { 
                         float localBlockX = player->position.x - block->x; 
                         float localBlockZ = player->position.z - block->z; 
-                        // float checkX = player->position.x;
-                        // float checkZ = player->position.z;
-
-                        // switch (block->isSlope)
-                        // {
-                        //     case 1:
-                        //         checkZ = player->position.z + playerHalfWidth(player);
-                        //         break;
-
-                        //     case 2:
-                        //         checkX = player->position.x + playerHalfWidth(player);
-                        //         break;
-
-                        //     case 3:
-                        //         checkZ = player->position.z - playerHalfWidth(player);
-                        //         break;
-
-                        //     case 4:
-                        //         checkX = player->position.x - playerHalfWidth(player);
-                        //         break;
-                        // }
-
-                        // float localBlockX = checkX - block->x;
-                        // float localBlockZ = checkZ - block->z;
-
+                        
                         float rampHeightLocal; 
                         switch (block->isSlope) { 
                             case 1: rampHeightLocal = 1 - localBlockZ; break; 
@@ -192,9 +198,103 @@ int playerCollides(Player* player) {
     return 0; 
 }
 
+float radians(float degrees)
+{
+    return degrees * 3.1415926535 / 180.0f;
+}
+
+float entityMaxY(Entity *entity)
+{
+    return entity->position.y + entityHeight(entity);
+}
+
+float entityHeight(Entity *entity)
+{
+    Vec3 dimensions = modelManager.animatedModels[entity->animatedModelIndex].dimensions;
+
+    float halfX = dimensions.x * 0.5f;
+    float halfY = dimensions.y * 0.5f;
+    float halfZ = dimensions.z * 0.5f;
+
+    float x = radians(entity->rotation.x);
+    float z = radians(entity->rotation.z);
+
+    float halfHeight =
+        fabsf(cosf(x) * cosf(z)) * halfY +
+        fabsf(sinf(x) * cosf(z)) * halfZ +
+        fabsf(sinf(z)) * halfX;
+
+    return entity->size * halfHeight * 2.0f;
+}
+                        
+int entityCollides(Entity *entity) { 
+    float halfWidthX = entityHalfWidthX(entity);
+    float halfWidthZ = entityHalfWidthZ(entity);
+
+    float minX = entity->position.x - halfWidthX;
+    float maxX = entity->position.x + halfWidthX;
+    float minY = entity->position.y;
+    float maxY = entity->position.y + entityHeight(entity);
+    float minZ = entity->position.z - halfWidthZ;
+    float maxZ = entity->position.z + halfWidthZ;
+//     printf("dims: %f %f %f\n",
+//     modelManager.animatedModels[entity->animatedModelIndex].dimensions.x,
+//     modelManager.animatedModels[entity->animatedModelIndex].dimensions.y,
+//     modelManager.animatedModels[entity->animatedModelIndex].dimensions.z
+// );
+
+// printf("half X: %f\n", entityHalfWidthX(entity));
+// printf("half Z: %f\n", entityHalfWidthZ(entity));
+    int voxelMinX = (int)round(minX); 
+    int voxelMaxX = (int)round(maxX); 
+    int voxelMinY = (int)round(minY); 
+    int voxelMaxY = (int)round(maxY); 
+    int voxelMinZ = (int)round(minZ); 
+    int voxelMaxZ = (int)round(maxZ); 
+
+    for (int x = voxelMinX; x <= voxelMaxX; x++) { 
+        for (int y = voxelMinY; y <= voxelMaxY; y++) { 
+            for (int z = voxelMinZ; z <= voxelMaxZ; z++) { 
+                Block *block = blockAtPosition(x,y,z); 
+
+                if (block == NULL) { continue; } 
+
+                if (blockRegistry[block->blockType].isPhysicsSolid && !block->isAir) { 
+                    if (block->isSlope) { 
+                        float localBlockX = entity->position.x - block->x; 
+                        float localBlockZ = entity->position.z - block->z; 
+                        
+                        float rampHeightLocal; 
+                        switch (block->isSlope) { 
+                            case 1: rampHeightLocal = 1 - localBlockZ; break; 
+                            case 2: rampHeightLocal = 1 - localBlockX; break; 
+                            case 3: rampHeightLocal = 1 - fabsf(localBlockZ); break; 
+                            case 4: rampHeightLocal = 1 - fabsf(localBlockX); break; 
+                            default: rampHeightLocal = 0; break; 
+                        } 
+
+                        rampHeightLocal += block->y; 
+                        if ((rampHeightLocal - minY) > 0.55f) { 
+                            return 1; 
+                        } else { 
+                            continue; 
+                        } 
+                    } else { 
+                        return 1; 
+                    } 
+                } 
+            } 
+        } 
+    } 
+
+    return 0; 
+}
+float totTime = 0.0f;
 
 void updatePlayerPhysics(Player* player)
 {
+    if (totTime < 5.0) { totTime += DELTA_TIME; return; }
+
     float gravity = (player->isInWater) ? (5.0f) : (20.0f);
     if (player->isOnGround == -1) {
         gravity = 0.0f;
@@ -227,28 +327,7 @@ void updatePlayerPhysics(Player* player)
     player->position.y -= 0.01;
 
     player->position.y += player->velocity.y * DELTA_TIME;
-    // if (playerCollides(player))
-    // {
-    //     if (player->velocity.y > 0)
-    //     {
-    //         while (playerCollides(player))
-    //         {
-    //             player->position.y -= 0.001f;
-    //         }
-    //     }
-    //     else if (player->velocity.y < 0)
-    //     {
-            
-    //         while (playerCollides(player))
-    //         {
-    //             player->position.y += 0.001f;
-    //         }
 
-    //         player->isOnGround = 1;
-    //     }
-
-    //     player->velocity.y = 0;
-    // }
     if (playerCollides(player))
     {
         if (player->velocity.y > 0)
@@ -284,3 +363,72 @@ void updatePlayerPhysics(Player* player)
     }
 }
 
+void updateEntityPhysics(Entity *entity)
+{
+    if (totTime < 5.0) { return; }
+    float gravity = (entity->isInWater) ? (5.0f) : (20.0f);
+
+    int slopeDirCur = slopeDirEntity(entity);
+    entity->velocity.y -= gravity * DELTA_TIME;
+    
+    entity->isOnGround = 0;
+
+    
+
+    entity->position.x += entity->velocity.x * DELTA_TIME;
+    entity->position.y += 0.01;
+    if (entityCollides(entity))
+    {
+        
+        entity->position.x -= entity->velocity.x * DELTA_TIME;
+        entity->velocity.x = 0;
+    }
+    entity->position.y -= 0.01;
+    
+    entity->position.y += 0.01;
+    entity->position.z += entity->velocity.z * DELTA_TIME;
+    if (entityCollides(entity))
+    {
+        entity->position.z -= entity->velocity.z * DELTA_TIME;
+        entity->velocity.z = 0;
+    }
+    entity->position.y -= 0.01;
+
+    entity->position.y += entity->velocity.y * DELTA_TIME;
+
+    if (entityCollides(entity))
+    {
+        if (entity->velocity.y > 0)
+        {
+            float startY = entity->position.y;
+            while (entityCollides(entity))
+            {
+                entity->position.y -= 0.001f;
+                if (startY - entity->position.y > 2.0f)
+                {
+                    entity->position.y = startY; // couldn't resolve - bail instead of falling forever
+                    break;
+                }
+            }
+        }
+        else if (entity->velocity.y < 0)
+        {
+            float startY = entity->position.y;
+            while (entityCollides(entity))
+            {
+                entity->position.y += 0.001f;
+                if (entity->position.y - startY > 2.0f)
+                {
+                    entity->position.y = startY;
+                    break;
+                }
+            }
+
+            entity->isOnGround = 1;
+        }
+
+        entity->velocity.y = 0;
+    }
+
+    // printf("finished entity physics\n");
+}

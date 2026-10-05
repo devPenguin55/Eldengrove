@@ -26,7 +26,8 @@ void handleKeyDown(unsigned char key, int x, int y);
 void handleKeyUp(unsigned char key, int x, int y);
 void blockPlacingOrBreakingLightingRecalculation(Chunk *chunk);
 void handleMouse(int button, int state, int x, int y);
-int slopeDir(Player* player);
+int slopeDir(Player *player);
+int slopeDirEntity(Entity *entity);
 void handleMovingMouse(int x, int y);
 void handleUserMovement();
 

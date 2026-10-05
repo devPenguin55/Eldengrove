@@ -778,6 +778,39 @@ int initAnimatedModel(const char *objPath) {
         currentVertexNumber += mesh->mNumVertices;
     }
 
+    Vec3 min = {
+        99999,
+        99999,
+        99999
+    };
+
+    Vec3 max = {
+        -99999,
+        -99999,
+        -99999
+    };
+
+    for (unsigned int m = 0; m < assimpScene->mNumMeshes; m++) {
+        struct aiMesh *mesh = assimpScene->mMeshes[m];
+
+        for (unsigned int v = 0; v < mesh->mNumVertices; v++) {
+            struct aiVector3D p = mesh->mVertices[v];
+
+            min.x = fminf(min.x, p.x);
+            min.y = fminf(min.y, p.y);
+            min.z = fminf(min.z, p.z);
+
+            max.x = fmaxf(max.x, p.x);
+            max.y = fmaxf(max.y, p.y);
+            max.z = fmaxf(max.z, p.z);
+        }
+    }
+
+    currentModel->dimensions.x = 0.8f;
+    currentModel->dimensions.y = fabsf(max.y) - fabsf(min.y); // since y is up here (diff coord system for me)
+    currentModel->dimensions.z = 0.8f;
+
+
     glGenVertexArrays(1, &currentModel->vao);
     glGenBuffers(1, &currentModel->vbo);
     glGenBuffers(1, &currentModel->ebo);
@@ -962,47 +995,10 @@ int initAnimatedModel(const char *objPath) {
         mat4FromAiMatrix4x4(assimpScene->mRootNode->mTransformation)
     );
 
-    Vec3 min = {
-        99999,
-        99999,
-        99999
-    };
-
-    Vec3 max = {
-        -99999,
-        -99999,
-        -99999
-    };
-
-    for (unsigned int m = 0; m < assimpScene->mNumMeshes; m++) {
-        struct aiMesh *mesh = assimpScene->mMeshes[m];
-
-        for (unsigned int v = 0; v < mesh->mNumVertices; v++) {
-            struct aiVector3D p = mesh->mVertices[v];
-
-            min.x = fminf(min.x, p.x);
-            min.y = fminf(min.y, p.y);
-            min.z = fminf(min.z, p.z);
-
-            max.x = fmaxf(max.x, p.x);
-            max.y = fmaxf(max.y, p.y);
-            max.z = fmaxf(max.z, p.z);
-        }
-    }
-
-    printf("dimensions: %f x %f x %f\n",
-        max.x - min.x,
-        max.y - min.y,
-        max.z - min.z
-    );
-
-    currentModel->dimensions.x = max.x - min.x;
-    currentModel->dimensions.z = max.y - min.y; // since y is up here (diff coord system for me)
-    currentModel->dimensions.y = max.z - min.z;
-
+    
     
     aiReleaseImport(assimpScene);
-
+    printf("Model %s loaded!\n", objPath);
     return currentModelIndex;
 }
 
@@ -1163,7 +1159,7 @@ int createModelInstance(Model *model, Vec3 *position, Vec3 *rotation, float scal
     }
 
     unsigned int instanceIndex = model->instanceCount++;
-
+    printf("assigned instance index %d\n", instanceIndex);
     model->instances[instanceIndex].position[0] = position->x;
     model->instances[instanceIndex].position[1] = position->y;
     model->instances[instanceIndex].position[2] = position->z;
@@ -1450,7 +1446,7 @@ void initModelManager() {
     // // ! WARNING! dont try to make a pointer to the model, since it might not be valid after generating more instances
     // for (int i = 0; i < 100; i++)
     // {
-    //     createModelInstance(&modelManager.models[treeModelIndex], &(Vec3){33.0f+i*5, 60.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, 1.0f);
+    //     createModelInstance(&modelM  anager.models[treeModelIndex], &(Vec3){33.0f+i*5, 60.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, 1.0f);
     // }
     // for (int i = 0; i < 100; i++)
     // {
@@ -1459,11 +1455,76 @@ void initModelManager() {
 
     initEntitySystem();
 
-    createEntity(ANIMATED_MODEL_INDEX_CLERIC, 10, &(Vec3){33.0f, 60.0f, 0.0f}, &(Vec3){-1.0f, 0.0f, 0.0f}, &(Vec3){0.0f, 90.0f, 0.0f}, 1.0f);
+    createEntity(ANIMATED_MODEL_INDEX_CLERIC, 1, &(Vec3){33.0f, 35.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, 1.0f);
 
 }
 
+void renderEntityBoundingBox(Entity *entity)
+{
+    float halfX = entityHalfWidthX(entity);
+    float halfZ = entityHalfWidthZ(entity);
+    float height = entityHeight(entity);
 
+    float minX = entity->position.x - halfX;
+    float maxX = entity->position.x + halfX;
+    float minY = entity->position.y;
+    float maxY = entity->position.y + height;
+    float minZ = entity->position.z - halfZ;
+    float maxZ = entity->position.z + halfZ;
+
+    glUseProgram(0);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_TEXTURE_2D);
+    glDisable(GL_LIGHTING);
+    glLineWidth(5.0f);
+    glColor3f(1, 0, 0);
+
+    glBegin(GL_LINES);
+
+    // bottom
+    glVertex3f(minX, minY, minZ);
+    glVertex3f(maxX, minY, minZ);
+
+    glVertex3f(maxX, minY, minZ);
+    glVertex3f(maxX, minY, maxZ);
+
+    glVertex3f(maxX, minY, maxZ);
+    glVertex3f(minX, minY, maxZ);
+
+    glVertex3f(minX, minY, maxZ);
+    glVertex3f(minX, minY, minZ);
+
+    // top
+    glVertex3f(minX, maxY, minZ);
+    glVertex3f(maxX, maxY, minZ);
+
+    glVertex3f(maxX, maxY, minZ);
+    glVertex3f(maxX, maxY, maxZ);
+
+    glVertex3f(maxX, maxY, maxZ);
+    glVertex3f(minX, maxY, maxZ);
+
+    glVertex3f(minX, maxY, maxZ);
+    glVertex3f(minX, maxY, minZ);
+
+    // vertical edges
+    glVertex3f(minX, minY, minZ);
+    glVertex3f(minX, maxY, minZ);
+
+    glVertex3f(maxX, minY, minZ);
+    glVertex3f(maxX, maxY, minZ);
+
+    glVertex3f(maxX, minY, maxZ);
+    glVertex3f(maxX, maxY, maxZ);
+
+    glVertex3f(minX, minY, maxZ);
+    glVertex3f(minX, maxY, maxZ);
+
+    glEnd();
+
+    glPopAttrib();
+    glEnable(GL_DEPTH_TEST);
+}
 
 void initGraphics()
 {
@@ -3077,6 +3138,7 @@ void drawGraphics()
     // updateModelInstance(&modelManager.models[0], 1, &(Vec3){27.0f, 60.0f, 0.0f}, &(Vec3){0.0f, currentTime, 0.0f}, 1.0f);
     // updateModelInstance(&modelManager.models[1], 0, &(Vec3){39.0f, 60.0f, 0.0f}, &(Vec3){0.0f, 0.0f, currentTime}, 1.0f);
     worldEntityUpdate();
+    
 
     buildWorldMesh(); // fills worldVertices and worldVertexCount
 
@@ -3153,6 +3215,7 @@ void drawGraphics()
     glBindTexture(GL_TEXTURE_2D_ARRAY, 0);
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_BUFFER, 0);
+    renderEntityBoundingBox(&worldEntities.entities[0]);
     glDisable(GL_TEXTURE_2D);
     glDisable(GL_TEXTURE_2D_ARRAY);
     glDisable(GL_TEXTURE_3D);   

@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include "chunks.h"
 #include "vectors.h"
+#include "entitySystem.h"
 
 typedef struct Player {
     Vec3 position;
@@ -19,7 +20,14 @@ Chunk *chunkAtPosition(int voxelX, int voxelY, int voxelZ);
 Block *blockAtPosition(int voxelX, int voxelY, int voxelZ);
 int isSolidVoxel(int voxelX, int voxelY, int voxelZ);
 float playerHalfWidth(Player* player);
+float entityHalfWidthX(Entity* entity);
+float entityHalfWidthZ(Entity* entity);
+float entityMaxY(Entity *entity);
+float entityHeight(Entity *entity);
 int playerCollides(Player* player);
+int entityCollides(Entity *entity);
+float radians(float degrees);
 void updatePlayerPhysics(Player *player);
+void updateEntityPhysics(Entity *entity);
 
 #endif

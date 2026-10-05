@@ -13,7 +13,7 @@ GLfloat PlayerDirY = 0;
 GLfloat PlayerDirZ = -1;
 Player player = (Player){
     .position.x = 33.3,
-    .position.y = 120,
+    .position.y = 65,
     // .position.x = 0.0,
     // .position.y = 0.0,
     .position.z = 0,
@@ -459,6 +459,42 @@ int slopeDir(Player* player) {
     float maxY = player->position.y + player->height; 
     float minZ = player->position.z - 0.5f; 
     float maxZ = player->position.z + 0.5f; 
+
+    int voxelMinX = (int)round(minX); 
+    int voxelMaxX = (int)round(maxX); 
+    int voxelMinY = (int)round(minY); 
+    int voxelMaxY = (int)round(maxY); 
+    int voxelMinZ = (int)round(minZ); 
+    int voxelMaxZ = (int)round(maxZ); 
+
+    for (int x = voxelMinX; x <= voxelMaxX; x++) { 
+        for (int y = voxelMinY; y <= voxelMaxY; y++) { 
+            for (int z = voxelMinZ; z <= voxelMaxZ; z++) { 
+                Block *block = blockAtPosition(x,y,z); 
+
+                if (block == NULL) { continue; } 
+
+                if (blockRegistry[block->blockType].isPhysicsSolid && !block->isAir) { 
+                    if (block->isSlope) { 
+                        return block->isSlope;
+                    } else { 
+                        continue;
+                    } 
+                } 
+            } 
+        } 
+    } 
+
+    return -1; 
+}
+
+int slopeDirEntity(Entity *entity) { 
+    float minX = entity->position.x - 0.5f; 
+    float maxX = entity->position.x + 0.5f; 
+    float minY = entity->position.y; 
+    float maxY = entityMaxY(entity); 
+    float minZ = entity->position.z - 0.5f; 
+    float maxZ = entity->position.z + 0.5f; 
 
     int voxelMinX = (int)round(minX); 
     int voxelMaxX = (int)round(maxX); 

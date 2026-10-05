@@ -85,6 +85,8 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
             h += (int)(rolling * 50.0f * plainsMask);
             h += (int)(bigHills * 50.0f * plainsMask);
 
+            
+
             rawHeightMap[x + z * ChunkWidthX] = h;
         }
     }
@@ -124,6 +126,9 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
         for (int z = 0; z < ChunkLengthZ; z++)
         {
             int generatedBlockNoiseHeight = heightMap[x + z * ChunkWidthX];
+
+            // ! WARNING ! REMOVE !
+            generatedBlockNoiseHeight = 34;
 
             for (int y = 0; y < ChunkHeightY; y++)
             {
