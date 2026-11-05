@@ -306,7 +306,7 @@ float getGroundY(int x, int z)
         Block *block = blockAtPosition(x, y, z);
 
         if (block != NULL && block->isAir != 1)
-            return y + 1;
+            return y+1;
     }
 
     return -1.0f;
@@ -318,9 +318,9 @@ float getWalkableY(Entity *entity, int x, float currentY, int z)
 
     float groundY = getGroundY(x, z);
 
-    if (groundY < 0)
+    if (groundY < 0) {
         return -1.0f;
-
+    }
     testEntity.position.x = x;
     testEntity.position.y = groundY;
     testEntity.position.z = z;
@@ -443,6 +443,9 @@ void aStarPathfinding(Entity *entity, Vec3 *targetPosition)
             if (neighborY < 0) { continue; }
             
             int dy = neighborY - current.position.y;
+            if (blockAtPosition(neighborX, (int)round(neighborY)-1, neighborZ)->blockType == BLOCK_TYPE_WATER) {
+                continue; 
+            }
             float dxFromStart = neighborX - startPosition.x;
             float dyFromStart = neighborY - startPosition.y;
             float dzFromStart = neighborZ - startPosition.z;
@@ -584,23 +587,69 @@ void worldEntityUpdate() {
 
         if (1)
         {
+            Vec3 targetPathPoint;
+            targetPathPoint.x = curEntity->position.x;
+            targetPathPoint.y = curEntity->position.y;
+            targetPathPoint.z = curEntity->position.z;
             if (curEntity->path == NULL || curEntity->pathIndex >= curEntity->pathLength || 1)
             {
-                printf("started pathfinding %f\n", DELTA_TIME);
+                // printf("started pathfinding %f\n", DELTA_TIME);
                 aStarPathfinding(curEntity,&player.position);
-                printf("   -> got length %d\n", curEntity->pathLength);
-                
+                // printf("   -> got length %d\n", curEntity->pathLength);
+                if (curEntity->pathLength <= 0) {
+                    if (curEntity->pathLength == -1) {                      
+                        targetPathPoint.x = curEntity->position.x;
+                        targetPathPoint.y = curEntity->position.y;
+                        targetPathPoint.z = curEntity->position.z;  
+                        // printf("-1 so the y is %f!\n", targetPathPoint.y);                      
+                    } else {
+                        // here, we don't have a direct path so just jump and move in player's direction
+                        int dirX = ((curEntity->position.x - player.position.x) < 0) * 2 - 1;
+                        int dirZ = ((curEntity->position.z - player.position.z) < 0) * 2 - 1;
+                        int nx = (int)(curEntity->position.x) + dirX;
+                        int ny = (int)(curEntity->position.y);
+                        int nz = (int)(curEntity->position.z) + dirZ;
+                        if (ny >= 0 && ny < ChunkHeightY) {
+                            Block *nBlock = blockAtPosition(nx, ny, nz);
+                            Block *curBlock = blockAtPosition((int)(curEntity->position.x), (int)(curEntity->position.y), (int)(curEntity->position.z));
+                            if (!nBlock->isAir && !curBlock->isAir) {
+                                targetPathPoint.x = nx;
+                                targetPathPoint.z = nz;
+                                // targetPathPoint.y += 1;
+                            } else if (nBlock->isAir && !curBlock->isAir) {
+                                targetPathPoint.x = nx;
+                                targetPathPoint.y = nBlock->y;
+                                targetPathPoint.z = nz;
+                            } else if (nBlock->isAir && curBlock->isAir) {
+                                targetPathPoint.x = nx;
+                                targetPathPoint.y--;
+                                targetPathPoint.z = nz;
+                            } else if (blockAtPosition(nx, ny+1, nz)->isAir && !curBlock->isAir) {
+                                targetPathPoint.x = nx;
+                                targetPathPoint.z = nz;
+                                targetPathPoint.y += 1;
+                            } else {
+                                targetPathPoint.x = curEntity->position.x;
+                                targetPathPoint.y = curEntity->position.y;
+                                targetPathPoint.z = curEntity->position.z;
+                            }
+                            // printf("%d %d %d \n", !nBlock->isAir, !curBlock->isAir, blockAtPosition(nx, ny+1, nz)->isAir, targetPathPoint.y);
+                        }
+                    }
+                }
                 curEntity->pathIndex = 1;
             }
 
-            if (curEntity->path && curEntity->pathIndex < curEntity->pathLength && (int)totEntityTime % 1 == 0 && totEntityTime > 1.0f)
+            if ((int)totEntityTime % 1 == 0 && totEntityTime > 1.0f)
             {
-                Vec3 target = curEntity->path[curEntity->pathIndex];
+                if (curEntity->pathLength > 0 && curEntity->path && curEntity->pathIndex < curEntity->pathLength) {
+                    targetPathPoint = curEntity->path[curEntity->pathIndex];
+                }
 
                 // float dx = target.x - curEntity->position.x;
                 // float dy = target.y - curEntity->position.y;
                 // float dz = target.z - curEntity->position.z;
-                curEntity->position = target;
+                curEntity->position = targetPathPoint;
 
                 // float distance = sqrtf(dx * dx + dy * dy + dz * dz);
 
@@ -629,7 +678,7 @@ void worldEntityUpdate() {
             // printf("ended pathfinding\n");
         }
         // printf("%f %f %f\n", curEntity->velocity.x, curEntity->velocity.y, curEntity->velocity.z);
-        // updateEntityPhysics(curEntity);
+        
         
 
         AnimatedModel *model = &modelManager.animatedModels[curEntity->animatedModelIndex];
