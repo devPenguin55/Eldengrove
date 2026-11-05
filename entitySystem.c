@@ -352,7 +352,7 @@ void aStarPathfinding(Entity *entity, Vec3 *targetPosition)
 
     if (goalY < 0)
     {
-        printf("Target is not walkable\n");
+        // printf("Target is not walkable\n");
         return;
     }
 
@@ -539,13 +539,13 @@ void aStarPathfinding(Entity *entity, Vec3 *targetPosition)
         }
         // printf("%d\n",openSet.size);
     }
-    printf(
-        "closed: %d | collision: %d | distance: %d | closedSize: %d\n",
-        closedCount,
-        collisionCount,
-        distanceCount,
-        closedSet.size
-    );
+    // printf(
+    //     "closed: %d | collision: %d | distance: %d | closedSize: %d\n",
+    //     closedCount,
+    //     collisionCount,
+    //     distanceCount,
+    //     closedSet.size
+    // );
 
     free(openSet.nodes);
     free(closedSet.nodes);

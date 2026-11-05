@@ -1455,7 +1455,8 @@ void initModelManager() {
 
     initEntitySystem();
 
-    createEntity(ANIMATED_MODEL_INDEX_CLERIC, 1, &(Vec3){33.0f, 35.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, 1.0f);
+    createEntity(ANIMATED_MODEL_INDEX_CLERIC, 1, &(Vec3){33.0f, 0.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, 1.0f);
+    // createEntity(ANIMATED_MODEL_INDEX_CLERIC, 3, &(Vec3){23.0f, 65.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, 0.8f);
 
 }
 
