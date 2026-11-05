@@ -1,7 +1,7 @@
 # Eldengrove
 
 ## What is Eldengrove?
-- Eldengrove was once a game engine that I was developing to make my own horror game (it features a 3D Voxel Engine with player physics, entities, slope blocks, water, infinite terrain generation, world saving, etc.)
+- Eldengrove was once a game engine that I was developing to make my own horror game (it features a 3D Voxel Engine with player physics, entities, slope blocks, water, infinite terrain generation, world saving, lighting engine, etc.)
 - I initially made the base game engine from scratch in C over the last year, but this year I am developing the actual gameplay.
 - During the day, you collect materials and scout nearby caves and rivers to escape to at night. At night, the world dissolves, revealing toxic grounds riddled with enemies, and the only way to escape is by cave/river and building a shelter.
 
