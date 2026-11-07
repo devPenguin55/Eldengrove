@@ -1455,7 +1455,7 @@ void initModelManager() {
 
     initEntitySystem();
 
-    createEntity(ANIMATED_MODEL_INDEX_CLERIC, 1, &(Vec3){33.0f, 0.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, 1.0f);
+    createEntity(ANIMATED_MODEL_INDEX_CLERIC, 1, &(Vec3){33.0f, 70.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, 1.0f);
     // createEntity(ANIMATED_MODEL_INDEX_CLERIC, 3, &(Vec3){23.0f, 65.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, 0.8f);
 
 }
@@ -3318,7 +3318,7 @@ void drawGraphics()
     glDisable(GL_CULL_FACE);
     glUseProgram(0);
     glColor3f(1.0f, 0.85f, 0.0f);
-
+    
     glBegin(GL_QUADS);
 
     glVertex3f(sunX - rightX*sunSize - upX*sunSize,
@@ -3326,22 +3326,24 @@ void drawGraphics()
                sunZ - rightZ*sunSize - upZ*sunSize);
 
     glVertex3f(sunX + rightX*sunSize - upX*sunSize,
-               sunY + rightY*sunSize - upY*sunSize,
-               sunZ + rightZ*sunSize - upZ*sunSize);
-
+        sunY + rightY*sunSize - upY*sunSize,
+        sunZ + rightZ*sunSize - upZ*sunSize);
+        
     glVertex3f(sunX + rightX*sunSize + upX*sunSize,
-               sunY + rightY*sunSize + upY*sunSize,
+        sunY + rightY*sunSize + upY*sunSize,
                sunZ + rightZ*sunSize + upZ*sunSize);
-
+               
     glVertex3f(sunX - rightX*sunSize + upX*sunSize,
-               sunY - rightY*sunSize + upY*sunSize,
-               sunZ - rightZ*sunSize + upZ*sunSize);
+        sunY - rightY*sunSize + upY*sunSize,
+        sunZ - rightZ*sunSize + upZ*sunSize);
     glEnd();
     glPopAttrib();
-    
+        
+    glEnable(GL_CULL_FACE);
+    glEnable(GL_DEPTH_TEST);
     // !
 
-
+ 
 
 
 
@@ -3363,14 +3365,16 @@ void drawGraphics()
         size[0] *= outlineScale;
         size[1] *= outlineScale;
 
+        glPushAttrib(GL_ALL_ATTRIB_BITS);
         for (int i = 1; i < 7; i++)
         {
             cubeFace(Vertices, translation, size, i, BLOCK_TYPE_SELECT);
         }
 
+        glPopAttrib();
+
         glColor3f(1.0f, 1.0f, 1.0f);
     }
-    glPopAttrib();
 
     glUseProgram(0);
     glBindVertexArray(0);
