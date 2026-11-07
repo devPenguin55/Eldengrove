@@ -1545,7 +1545,7 @@ void initGraphics()
     destroyStageTextureArray[6] = loadTexture("assets/destroy_stage_6.png");
     destroyStageTextureArray[7] = loadTexture("assets/destroy_stage_7.png");
     destroyStageTextureArray[8] = loadTexture("assets/destroy_stage_8.png");
-    glEnable(GL_TEXTURE_2D);
+    glEnable(GL_TEXTURE_2D); 
 
     selectedBlockToRender.active = 0;
 
@@ -3022,6 +3022,20 @@ void drawGraphics()
     }
     DELTA_TIME = (currentTime - lastTime);
     lastTime = currentTime;
+
+
+    float timeSun = glutGet(GLUT_ELAPSED_TIME) / 4000.0f;
+    float orbitRadius = ChunkWidthX * CHUNK_RENDER_RADIUS * 2;
+
+    float sunAngle = timeSun;
+    float sunX = player.position.x + orbitRadius * cosf(sunAngle);
+    float sunY = 50.0f + orbitRadius * sinf(sunAngle);
+    float dayCycleProgress = fmodf(sunAngle, 2.0f * M_PI);
+
+    float sunZ = player.position.z;
+    
+    float sunSize = 30.0f;
+
     handleUserMovement();
     updatePlayerPhysics(&player);
     raycastFromCamera();
@@ -3051,6 +3065,71 @@ void drawGraphics()
 
     // clear color buffer to clear background, uses preset color setup in initGraphics
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    float sunset[] = {1.0f, 0.30f, 0.12f};
+    float skyBlue[] = {0.20f, 0.42f, 0.75f};
+    float nightSky[] = {0.015f, 0.025f, 0.10f};
+
+    float t = dayCycleProgress;
+
+    float* colorA;
+    float* colorB;
+    float blend;
+
+    if (t >= 3.0f*M_PI/2.0f && t <= (2.0*M_PI - 0.5f)) {
+        colorA = nightSky;
+        colorB = nightSky;
+        blend = 1.0f;
+    } else if (t > (2*M_PI -0.5f) || t < 0.30f) {
+        colorA = nightSky;
+        colorB = sunset;
+
+        if (t >M_PI) {
+
+            blend = (t - (2*M_PI-0.5f)) / (0.3f); 
+        } else {
+            blend = 1.0f;
+        }
+
+        if (blend > 1.0f || blend < 0.0f) {
+            blend = 1.0f;
+        }
+        blend = MIN(blend, 1.0f);
+
+    } else if (t < (M_PI - 0.6f)) {
+        colorA = sunset;
+        colorB = skyBlue;
+        blend = (t - 0.3) / 0.30f;
+        if (blend > 1.0f || blend < 0.0f) {
+            blend = 1.0f;
+        }
+        blend = MIN(blend, 1.0f);
+    } else if (t < (M_PI + 0.5f)) {
+        colorA = skyBlue;
+        colorB = sunset;
+
+        blend = (t - (M_PI - 0.6f)) / 0.30f;
+        if (blend > 1.0f || blend < 0.0f) {
+            blend = 1.0f;
+        }
+        blend = MIN(blend, 1.0f);
+    } else {
+        colorA = sunset;
+        colorB = nightSky;
+        blend = (t - (M_PI+0.5)) / 0.30f;
+        if (blend > 1.0f || blend < 0.0f) {
+            blend = 1.0f;
+        }
+        blend = MIN(blend, 1.0f);
+    } 
+    
+
+    float result[] = {
+        colorA[0] + (colorB[0] - colorA[0]) * blend,
+        colorA[1] + (colorB[1] - colorA[1]) * blend,
+        colorA[2] + (colorB[2] - colorA[2]) * blend
+    };
+
+    glClearColor(result[0], result[1], result[2], 0.0f);
 
     // camera
     glLoadIdentity();
@@ -3225,6 +3304,47 @@ void drawGraphics()
         glDisableVertexAttribArray(i);
 
     glPushAttrib(GL_ALL_ATTRIB_BITS);
+
+
+
+    float rightX = -sinf(sunAngle);
+    float rightY = cosf(sunAngle);
+    float rightZ = 0.0f;
+
+    float upX = 0.0f;
+    float upY = 0.0f;
+    float upZ = 1.0f;
+
+    glDisable(GL_CULL_FACE);
+    glUseProgram(0);
+    glColor3f(1.0f, 0.85f, 0.0f);
+
+    glBegin(GL_QUADS);
+
+    glVertex3f(sunX - rightX*sunSize - upX*sunSize,
+               sunY - rightY*sunSize - upY*sunSize,
+               sunZ - rightZ*sunSize - upZ*sunSize);
+
+    glVertex3f(sunX + rightX*sunSize - upX*sunSize,
+               sunY + rightY*sunSize - upY*sunSize,
+               sunZ + rightZ*sunSize - upZ*sunSize);
+
+    glVertex3f(sunX + rightX*sunSize + upX*sunSize,
+               sunY + rightY*sunSize + upY*sunSize,
+               sunZ + rightZ*sunSize + upZ*sunSize);
+
+    glVertex3f(sunX - rightX*sunSize + upX*sunSize,
+               sunY - rightY*sunSize + upY*sunSize,
+               sunZ - rightZ*sunSize + upZ*sunSize);
+    glEnd();
+    glPopAttrib();
+    
+    // !
+
+
+
+
+
     if (selectedBlockToRender.active)
     {
         GLfloat translation[3];
