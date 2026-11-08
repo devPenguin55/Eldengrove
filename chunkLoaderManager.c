@@ -646,12 +646,13 @@ void loadChunks(GLfloat playerCoords[2])
                             int sideLayer   = blockRegistry[q->blockType].sideTexture;
                             int topLayer    = blockRegistry[q->blockType].topTexture;
 
+                            int lightIdx = chunkAtPosition(x, y, z)->gpuLightIndex;
                             for (int i = 0; i < vertCount; i++)
                             {
                                 allVerts[i]->x += x;
                                 allVerts[i]->y += y;
                                 allVerts[i]->z += z;
-                                allVerts[i]->gpuLightIndex = chunkAtPosition(x, y, z)->gpuLightIndex;
+                                allVerts[i]->gpuLightIndex = lightIdx;
                                 allVerts[i]->face = FACE_SLOPE;
                             }
 
@@ -661,24 +662,100 @@ void loadChunks(GLfloat playerCoords[2])
                                 worldVertices = realloc(worldVertices, sizeof(Vertex) * worldVertexCapacity);
                             }
 
-                            Vertex tris[24] = {
-                                b0,b2,b1, b0,b3,b2,      // bottom (was b0,b1,b2 / b0,b2,b3 — reversed)
-                                w0,w2,w1, w0,w3,w2,      // back wall (was w0,w1,w2 / w0,w2,w3 — reversed)
-                                r0,r1,r2, r0,r2,r3,      // ramp — unchanged, this one was already correct
-                                tl0,tl2,tl1,             // left triangle (was tl0,tl1,tl2 — reversed)
-                                tr0,tr2,tr1              // right triangle (was tr0,tr1,tr2 — reversed)
-                            };
-                            int layersForTris[24] = {
-                                bottomLayer,bottomLayer,bottomLayer, bottomLayer,bottomLayer,bottomLayer,
-                                sideLayer,sideLayer,sideLayer, sideLayer,sideLayer,sideLayer,
-                                topLayer,topLayer,topLayer, topLayer,topLayer,topLayer,
-                                sideLayer,sideLayer,sideLayer,
-                                sideLayer,sideLayer,sideLayer
-                            };
+                            Vertex tris[24];
+                            int layersForTris[24];
+                            int triCount = 0;
 
-                            for (int i = 0; i < 24; i++)
+                            Block *belowBlock = blockAtPosition(x, y - 1, z);
+
+                            if (!belowBlock || belowBlock->isAir || !blockRegistry[belowBlock->blockType].isRenderSolid)
                             {
-                                tris[i].layer = (float)layersForTris[i];
+                                Vertex bottomTris[] = {b0,b2,b1, b0,b3,b2};
+                                for (int i = 0; i < 6; i++)
+                                {
+                                    tris[triCount] = bottomTris[i];
+                                    layersForTris[triCount++] = bottomLayer;
+                                }
+                            }
+
+                            // back wall
+                            int backX = x;
+                            int backZ = z;
+                            if (dir == 0) backZ--;
+                            else if (dir == 1) backX--;
+                            else if (dir == 2) backZ++;
+                            else if (dir == 3) backX++;
+                            Block *backBlock = blockAtPosition(backX, y, backZ);
+
+                            if (!backBlock || backBlock->isAir || !blockRegistry[backBlock->blockType].isRenderSolid || backBlock->isSlope)
+                            {
+                                Vertex backTris[] = {w0,w2,w1, w0,w3,w2};
+                                for (int i = 0; i < 6; i++)
+                                {
+                                    tris[triCount] = backTris[i];
+                                    layersForTris[triCount++] = sideLayer;
+                                }
+                            }
+
+                            // ramp
+                            Vertex rampTris[] = {r0,r1,r2, r0,r2,r3};
+                            for (int i = 0; i < 6; i++)
+                            {
+                                tris[triCount] = rampTris[i];
+                                layersForTris[triCount++] = topLayer;
+                            }
+
+                            // left side
+                            int leftX = x;
+                            int leftZ = z;
+
+                            if (dir == 0) leftX--;
+                            else if (dir == 1) leftZ--;
+                            else if (dir == 2) leftX++;
+                            else if (dir == 3) leftZ++;
+
+                            Block *leftBlock = blockAtPosition(leftX, y, leftZ);
+
+                            if (!leftBlock || leftBlock->isAir ||
+                                !blockRegistry[leftBlock->blockType].isRenderSolid ||
+                                leftBlock->isSlope)
+                            {
+                                Vertex leftTris[] = {tl0, tl2, tl1};
+
+                                for (int i = 0; i < 3; i++)
+                                {
+                                    tris[triCount] = leftTris[i];
+                                    layersForTris[triCount++] = sideLayer;
+                                }
+                            }
+
+                            // right side
+                            int rightX = x;
+                            int rightZ = z;
+
+                            if (dir == 0) rightX++;
+                            else if (dir == 1) rightZ++;
+                            else if (dir == 2) rightX--;
+                            else if (dir == 3) rightZ--;
+
+                            Block *rightBlock = blockAtPosition(rightX, y, rightZ);
+
+                            if (!rightBlock || rightBlock->isAir ||
+                                !blockRegistry[rightBlock->blockType].isRenderSolid ||
+                                rightBlock->isSlope)
+                            {
+                                Vertex rightTris[] = {tr0, tr2, tr1};
+
+                                for (int i = 0; i < 3; i++)
+                                {
+                                    tris[triCount] = rightTris[i];
+                                    layersForTris[triCount++] = sideLayer;
+                                }
+                            }
+
+                            for (int i = 0; i < triCount; i++)
+                            {
+                                tris[i].layer = layersForTris[i];
                                 worldVertices[worldVertexCount++] = tris[i];
                             }
 

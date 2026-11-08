@@ -554,14 +554,20 @@ void handleUserMovement()
         moveZ += RightZ;
     }
 
+
+    // ! REMOVE 
+    player.velocity.y = 0.0f;
+
     // if (DEV_MODE) {
     if (pressedKeys['r'])
     {
         player.velocity.y = 5.0f;
     }
+
+
     if (pressedKeys['f'])
     {
-        player.velocity.y = 0.0f;
+        player.velocity.y = -7.5f;
         player.isOnGround = -1;
     }
     // } else {
