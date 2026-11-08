@@ -593,15 +593,12 @@ void worldEntityUpdate() {
             targetPathPoint.z = curEntity->position.z;
             if (curEntity->path == NULL || curEntity->pathIndex >= curEntity->pathLength || 1)
             {
-                // printf("started pathfinding %f\n", DELTA_TIME);
                 aStarPathfinding(curEntity,&player.position);
-                // printf("   -> got length %d\n", curEntity->pathLength);
                 if (curEntity->pathLength <= 0) {
                     if (curEntity->pathLength == -1) {                      
                         targetPathPoint.x = curEntity->position.x;
                         targetPathPoint.y = curEntity->position.y;
-                        targetPathPoint.z = curEntity->position.z;  
-                        // printf("-1 so the y is %f!\n", targetPathPoint.y);                      
+                        targetPathPoint.z = curEntity->position.z;                        
                     } else {
                         // here, we don't have a direct path so just jump and move in player's direction
                         int dirX = ((curEntity->position.x - player.position.x) < 0) * 2 - 1;
@@ -680,7 +677,7 @@ void worldEntityUpdate() {
         // printf("%f %f %f\n", curEntity->velocity.x, curEntity->velocity.y, curEntity->velocity.z);
         
         
-
+        // TODO -> add in the functionality for interpolating between the points in the entity movement code
         AnimatedModel *model = &modelManager.animatedModels[curEntity->animatedModelIndex];
         updateAnimatedModelInstanceTransformOnly(
             model,

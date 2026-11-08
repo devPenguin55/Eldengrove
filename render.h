@@ -7,6 +7,10 @@
 
 
 #define MAX_BONE_INFLUENCE 4
+#define NIGHT 1
+#define SUNRISE 2
+#define DAY 3
+#define SUNSET 4
 
 typedef struct UV
 {
@@ -222,6 +226,7 @@ extern int hotbarBlocks[9];
 extern int hotbarActiveSlot;
 extern uint8_t *allChunkLighting;
 extern ModelManager modelManager;
+extern int dayNightPhase;
 
 void initGraphics();
 void createWorldLightingDataFromAllChunks();

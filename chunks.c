@@ -435,8 +435,7 @@ void transformChunkIntoNightChunk(Chunk *chunk) {
     float dirY = -1.0f;
     float dirZ = 0.0f;
 
-    float radius = 3.0f + rand() % 3;
-    radius = 2.0f;
+    float radius = 2.0f;
 
     for (int step = 0; step < 500; step++)
     {

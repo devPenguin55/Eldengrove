@@ -24,6 +24,6 @@ void main()
     vsOut.worldPos = position;
     vsOut.fragGpuLightIndex = gpuLightIndex;
     vsOut.fragFace = face;
-    
+
     gl_Position = gl_ModelViewProjectionMatrix * vec4(position, 1.0);
 }

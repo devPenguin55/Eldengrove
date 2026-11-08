@@ -60,7 +60,7 @@ ModelManager modelManager;
 int hotbarBlocks[9];
 int hotbarActiveSlot = -1;
 
-
+int dayNightPhase = DAY;
 
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -1455,7 +1455,7 @@ void initModelManager() {
 
     initEntitySystem();
 
-    createEntity(ANIMATED_MODEL_INDEX_CLERIC, 1, &(Vec3){33.0f, 0.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, 1.0f);
+    createEntity(ANIMATED_MODEL_INDEX_CLERIC, 1, &(Vec3){33.0f, 65.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, 1.0f);
     // createEntity(ANIMATED_MODEL_INDEX_CLERIC, 3, &(Vec3){23.0f, 65.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, 0.8f);
 
 }
@@ -1605,8 +1605,6 @@ void initGraphics()
         GL_R8UI,
         lightBuffer
     );
-
-
 
     
 
@@ -3076,15 +3074,18 @@ void drawGraphics()
     float blend;
 
     if (t >= 3.0f*M_PI/2.0f && t <= (2.0*M_PI - 0.5f)) {
+        // night
+        dayNightPhase = NIGHT;
         colorA = nightSky;
         colorB = nightSky;
         blend = 1.0f;
     } else if (t > (2*M_PI -0.5f) || t < 0.30f) {
+        // sunrise
         colorA = nightSky;
         colorB = sunset;
 
+        dayNightPhase = SUNRISE;
         if (t >M_PI) {
-
             blend = (t - (2*M_PI-0.5f)) / (0.3f); 
         } else {
             blend = 1.0f;
@@ -3096,14 +3097,19 @@ void drawGraphics()
         blend = MIN(blend, 1.0f);
 
     } else if (t < (M_PI - 0.6f)) {
+        // day
         colorA = sunset;
         colorB = skyBlue;
         blend = (t - 0.3) / 0.30f;
+        dayNightPhase = DAY;
         if (blend > 1.0f || blend < 0.0f) {
+
             blend = 1.0f;
         }
         blend = MIN(blend, 1.0f);
     } else if (t < (M_PI + 0.5f)) {
+        // sunset
+        dayNightPhase = SUNSET;
         colorA = skyBlue;
         colorB = sunset;
 
@@ -3113,6 +3119,8 @@ void drawGraphics()
         }
         blend = MIN(blend, 1.0f);
     } else {
+        dayNightPhase = NIGHT;
+        // back to night
         colorA = sunset;
         colorB = nightSky;
         blend = (t - (M_PI+0.5)) / 0.30f;
@@ -3217,9 +3225,7 @@ void drawGraphics()
     // updateModelInstance(&modelManager.models[0], 0, &(Vec3){33.0f, 60.0f, 0.0f}, &(Vec3){currentTime, 0.0f, 0.0f}, 1.0f);
     // updateModelInstance(&modelManager.models[0], 1, &(Vec3){27.0f, 60.0f, 0.0f}, &(Vec3){0.0f, currentTime, 0.0f}, 1.0f);
     // updateModelInstance(&modelManager.models[1], 0, &(Vec3){39.0f, 60.0f, 0.0f}, &(Vec3){0.0f, 0.0f, currentTime}, 1.0f);
-    worldEntityUpdate();
-    
-    
+    worldEntityUpdate();    
 
     buildWorldMesh(); // fills worldVertices and worldVertexCount
 
@@ -3341,11 +3347,7 @@ void drawGraphics()
     glPopAttrib();
         
     glEnable(GL_CULL_FACE);
-    glEnable(GL_DEPTH_TEST);
-    // !
-
- 
-
+    glEnable(GL_DEPTH_TEST); 
 
 
     if (selectedBlockToRender.active)
@@ -3592,6 +3594,7 @@ void drawGraphics()
         // !
         
         transformChunkIntoNightChunk(selectedBlockToRender.chunk);
+        player.position.y = 65.0f;
         
         // !
 
