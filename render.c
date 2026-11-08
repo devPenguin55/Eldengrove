@@ -3593,7 +3593,6 @@ void drawGraphics()
         
         transformChunkIntoNightChunk(selectedBlockToRender.chunk);
         
-        
         // !
 
 

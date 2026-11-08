@@ -446,6 +446,16 @@ void transformChunkIntoNightChunk(Chunk *chunk) {
             dirY += (rand() % 100 - 50) / 100.0f;
             dirZ += (rand() % 100 - 50) / 100.0f;
 
+            if (dirX > dirZ) {
+                float temp = dirX;
+                dirX = dirZ;
+                dirZ = temp;
+            } else if (dirX > dirZ) {
+                float temp = dirZ;
+                dirZ = dirX;
+                dirX = temp;
+            }
+            
             float length = sqrt(
                 dirX * dirX +
                 dirY * dirY +
