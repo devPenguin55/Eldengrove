@@ -1455,7 +1455,7 @@ void initModelManager() {
 
     initEntitySystem();
 
-    createEntity(ANIMATED_MODEL_INDEX_CLERIC, 1, &(Vec3){33.0f, 70.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, 1.0f);
+    createEntity(ANIMATED_MODEL_INDEX_CLERIC, 1, &(Vec3){33.0f, 0.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, 1.0f);
     // createEntity(ANIMATED_MODEL_INDEX_CLERIC, 3, &(Vec3){23.0f, 65.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, 0.8f);
 
 }
@@ -3065,7 +3065,7 @@ void drawGraphics()
 
     // clear color buffer to clear background, uses preset color setup in initGraphics
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-    float sunset[] = {1.0f, 0.30f, 0.12f};
+    float sunset[] = {0.85f, 0.45f, 0.30f};
     float skyBlue[] = {0.20f, 0.42f, 0.75f};
     float nightSky[] = {0.015f, 0.025f, 0.10f};
 
@@ -3218,6 +3218,7 @@ void drawGraphics()
     // updateModelInstance(&modelManager.models[0], 1, &(Vec3){27.0f, 60.0f, 0.0f}, &(Vec3){0.0f, currentTime, 0.0f}, 1.0f);
     // updateModelInstance(&modelManager.models[1], 0, &(Vec3){39.0f, 60.0f, 0.0f}, &(Vec3){0.0f, 0.0f, currentTime}, 1.0f);
     worldEntityUpdate();
+    
     
 
     buildWorldMesh(); // fills worldVertices and worldVertexCount
@@ -3567,7 +3568,7 @@ void drawGraphics()
 
     // switch the content of color and depth buffers
     glutSwapBuffers();
-
+    printf("%f\n", player.position.y);
     if (userBlockBreakingTimeElapsed != -1.f)
     {
         userBlockBreakingTimeElapsed += DELTA_TIME;
@@ -3586,6 +3587,15 @@ void drawGraphics()
 
         // break blocks
         int blockType = selectedBlockToRender.chunk->blocks[x + (ChunkWidthX)*z + (ChunkWidthX * ChunkLengthZ) * y].blockType;
+        
+
+        // !
+        
+        transformChunkIntoNightChunk(selectedBlockToRender.chunk);
+        
+        
+        // !
+
 
         if (userBlockBreakingTimeElapsed >= blockRegistry[blockType].blockBreakingTime && beginBlockBreakingIndex == (x + (ChunkWidthX)*z + (ChunkWidthX * ChunkLengthZ) * y))
         {

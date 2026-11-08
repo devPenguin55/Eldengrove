@@ -123,7 +123,6 @@ typedef struct Queue
 
 #define SEA_LEVEL 35
 
-#define BASELINE_SKYLIGHT_VALUE 15
 
 // upper is more left and bigger, lower is more right and smaller
 #define GET_SKYLIGHT(b) (((b) >> 4) & 0xF)                           // upper 4 bits
@@ -134,6 +133,7 @@ typedef struct Queue
 #define IS_CELL_SOLID(cell) ((cell).blockType != BLOCK_TYPE_AIR)
 
 
+extern int BASELINE_SKYLIGHT_VALUE;
 extern float BlockWidthX;
 extern float BlockLengthZ;
 extern float BlockHeightY;
@@ -142,6 +142,7 @@ extern Queue lightingQueue;
 extern BlockType blockRegistry[100];
 
 void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, int flag, uint64_t key);
+void transformChunkIntoNightChunk(Chunk *chunk);
 void initChunkMeshingSystem();
 void handleProgramClose();
 void generateChunkMesh(Chunk *chunk);

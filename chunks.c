@@ -13,13 +13,14 @@
 
 ChunkMeshQuads chunkMeshQuads;
 BlockType blockRegistry[100];
-Queue lightingQueue;
+Queue lightingQueue; 
 
 float BlockWidthX = 1;
 float BlockHeightY = 1;
 float BlockLengthZ = 1;
 
 int DEBUG_MODE = 0;
+int BASELINE_SKYLIGHT_VALUE = 15;
 
 static inline float clamp(float value, float minVal, float maxVal)
 {
@@ -128,7 +129,7 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
             int generatedBlockNoiseHeight = heightMap[x + z * ChunkWidthX];
 
             // ! WARNING ! REMOVE !
-            generatedBlockNoiseHeight = 34;
+            // generatedBlockNoiseHeight = 34;
 
             for (int y = 0; y < ChunkHeightY; y++)
             {
@@ -369,6 +370,214 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
             }
         }
     }
+}
+
+
+void carveOutHoleAtChunkCoord(int x, int y, int z, Chunk *chunk) {
+    int radius = 2;
+    for (int dx = -radius; dx <= radius; dx++) {
+        for (int dy = -radius; dy <= radius; dy++) {
+            for (int dz = -radius; dz <= radius; dz++) {
+                if (!(dx == 0 && dy == 0 && dz == 0)) { continue; }
+
+                int idx = x+dx + (dz+z) * ChunkWidthX + (y+dy) * ChunkWidthX * ChunkLengthZ;
+                if (idx < 0 || idx >= ChunkWidthX*ChunkLengthZ*ChunkHeightY) { continue; }
+                chunk->blocks[idx].isAir = 1;
+            }
+        }
+    }
+}
+
+int randomNoise(uint64_t seed, int step, int pointIdx, int axis) {
+    uint32_t hash = (uint32_t)seed;
+    hash ^= (uint32_t)step * 0x9E3779B9u;
+    hash ^= (uint32_t)pointIdx * 0x85EBCA6Bu;
+    hash ^= (uint32_t)axis * 0xC2B2AE35u;
+
+    hash ^= hash >> 16;
+    hash *= 0x7FEB352Du;
+    hash ^= hash >> 15;
+    hash *= 0x846CA68Bu;
+    hash ^= hash >> 16;
+
+    return (int)(hash % 3) - 1;
+}
+
+
+uint32_t hashCoords(int x, int y, int z, int seed) {
+    uint32_t hash = (uint32_t)seed;
+    hash ^= (uint32_t)x * 0x9E3779B9u;
+    hash ^= (uint32_t)y * 0x85EBCA6Bu;
+    hash ^= (uint32_t)z * 0xC2B2AE35u;
+
+    hash ^= hash >> 16;
+    hash *= 0x7FEB352Du;
+    hash ^= hash >> 15;
+    hash *= 0x846CA68Bu;
+    hash ^= hash >> 16;
+    
+    return hash;
+}
+
+int randomRange(int min, int max, int x, int y, int z, int seed) {
+    return min + hashCoords(x, y, z, seed) % (max - min + 1);
+}
+
+void transformChunkIntoNightChunk(Chunk *chunk) {
+    int chunkXUnit = ChunkWidthX * BlockWidthX;
+    int chunkZUnit = ChunkLengthZ * BlockLengthZ;
+
+    float x = player.position.x;
+    float y = player.position.y;
+    float z = player.position.z;
+
+    float dirX = 1.0f;
+    float dirY = -1.0f;
+    float dirZ = 0.0f;
+
+    float radius = 3.0f + rand() % 3;
+    radius = 2.0f;
+
+    for (int step = 0; step < 500; step++)
+    {
+        if (rand() % 15 == 0)
+        {
+            dirX += (rand() % 100 - 50) / 100.0f;
+            dirY += (rand() % 100 - 50) / 100.0f;
+            dirZ += (rand() % 100 - 50) / 100.0f;
+
+            float length = sqrt(
+                dirX * dirX +
+                dirY * dirY +
+                dirZ * dirZ
+            );
+
+            dirX /= length;
+            dirY /= length;
+            dirZ /= length;
+        }
+        if (step > 0) {
+            x += dirX;
+            y += dirY;
+            z += dirZ;
+        }
+
+        if (y < 1 || y >= ChunkHeightY - 1) {
+            x -= dirX;
+            y -= dirY;
+            z -= dirZ;
+            dirX *= -1;
+            dirY *= -1;
+            dirZ *= -1;
+        }
+
+        for (int dx = -radius; dx <= radius; dx++)
+        {
+            for (int dy = -radius; dy <= radius; dy++)
+            {
+                for (int dz = -radius; dz <= radius; dz++)
+                {
+                    if (dx * dx + dy * dy + dz * dz <= radius * radius)
+                    {
+                        int cx = x + dx;
+                        int cy = y + dy;
+                        int cz = z + dz;
+
+                        if (cy >= 1 && cy < ChunkHeightY-1) {
+                            Chunk *fetchedChunk = chunkAtPosition(cx, cy, cz);
+                            if (fetchedChunk == NULL) {
+                                dirX *= -1;
+                                dirZ *= -1;
+                            } else {
+                                cx -= fetchedChunk->chunkStartX;
+                                cz -= fetchedChunk->chunkStartZ;
+                                fetchedChunk->blocks[cx + cz * ChunkWidthX + cy * ChunkWidthX * ChunkLengthZ].isAir = 1;
+                                triggerRenderChunkRebuild(fetchedChunk);
+
+                                if (cx == 0) {
+                                    uint64_t chunkKey = packChunkKey(
+                                        (int)((fetchedChunk->chunkStartX - chunkXUnit) / (chunkXUnit)),
+                                        (int)((fetchedChunk->chunkStartZ) / (chunkZUnit)));
+
+                                    BucketEntry *result = getHashmapEntry(chunkKey);
+                                    if (result != NULL) {
+                                        triggerRenderChunkRebuild(result->chunkEntry);
+                                    }
+                                } else if (cx == ChunkWidthX-1) {
+                                    uint64_t chunkKey = packChunkKey(
+                                        (int)((fetchedChunk->chunkStartX + chunkXUnit) / (chunkXUnit)),
+                                        (int)((fetchedChunk->chunkStartZ) / (chunkZUnit)));
+
+                                    BucketEntry *result = getHashmapEntry(chunkKey);
+                                    if (result != NULL) {
+                                        triggerRenderChunkRebuild(result->chunkEntry);
+                                    }
+                                }
+
+                                if (cz == 0) {
+                                    uint64_t chunkKey = packChunkKey(
+                                        (int)((fetchedChunk->chunkStartX) / (chunkXUnit)),
+                                        (int)((fetchedChunk->chunkStartZ - chunkZUnit) / (chunkZUnit)));
+
+                                    BucketEntry *result = getHashmapEntry(chunkKey);
+                                    if (result != NULL) {
+                                        triggerRenderChunkRebuild(result->chunkEntry);
+                                    }
+                                } else if (cz == ChunkLengthZ-1) {
+                                    uint64_t chunkKey = packChunkKey(
+                                        (int)((fetchedChunk->chunkStartX) / (chunkXUnit)),
+                                        (int)((fetchedChunk->chunkStartZ + chunkZUnit) / (chunkZUnit)));
+
+                                    BucketEntry *result = getHashmapEntry(chunkKey);
+                                    if (result != NULL) {
+                                        triggerRenderChunkRebuild(result->chunkEntry);
+                                    }
+                                }
+
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+
+    uint64_t chunkKey = packChunkKey(
+        (int)((chunk->chunkStartX) / (chunkXUnit)),
+        (int)((chunk->chunkStartZ) / (chunkZUnit)));
+
+    BucketEntry *result = getHashmapEntry(chunkKey);
+    triggerRenderChunkRebuild(result->chunkEntry);
+
+    // * neighbor chunks too
+    chunkKey = packChunkKey(
+        (int)((chunk->chunkStartX - chunkXUnit) / (chunkXUnit)),
+        (int)((chunk->chunkStartZ) / (chunkZUnit)));
+    result = getHashmapEntry(chunkKey);
+    triggerRenderChunkRebuild(result->chunkEntry);
+    
+    chunkKey = packChunkKey(
+        (int)((chunk->chunkStartX + chunkXUnit) / (chunkXUnit)),
+        (int)((chunk->chunkStartZ) / (chunkZUnit)));
+    result = getHashmapEntry(chunkKey);
+    triggerRenderChunkRebuild(result->chunkEntry);
+
+    chunkKey = packChunkKey(
+        (int)((chunk->chunkStartX) / (chunkXUnit)),
+        (int)((chunk->chunkStartZ + chunkZUnit) / (chunkZUnit)));
+    result = getHashmapEntry(chunkKey);
+    triggerRenderChunkRebuild(result->chunkEntry);
+
+    chunkKey = packChunkKey(
+        (int)((chunk->chunkStartX) / (chunkXUnit)),
+        (int)((chunk->chunkStartZ - chunkZUnit) / (chunkZUnit)));
+    result = getHashmapEntry(chunkKey);
+    triggerRenderChunkRebuild(result->chunkEntry);
+
+
+    blockPlacingOrBreakingLightingRecalculation(chunk);
+    
 }
 
 void initChunkMeshingSystem()
@@ -1624,7 +1833,7 @@ void seedNeighborBorderSkyLighting(Queue *targetQueue, Chunk *chunk)
         }
     }
 }
-
+ 
 void computeInitialLightingForChunk(Chunk *chunk) {
     // this function is only called when the chunk has entered the render radius
     chunk->isInitialLightCreated = 1;

@@ -562,7 +562,7 @@ void worldEntityUpdate() {
     for (int i = 0; i < worldEntities.amtEntities; i++) {
         Entity *curEntity = &worldEntities.entities[i];
         curEntity->isInWater = heightInWater(&curEntity->position);
-
+        
         // apply movement code in terms of the velocity before the physics apply
         // * Note that if the entity stops moving after a collision, that's because it needs velocity inputs before physics calculations
         // if (curEntity->isOnGround && curEntity->path == NULL) {
