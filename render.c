@@ -2497,6 +2497,7 @@ void buildWorldMesh()
                 case FACE_SLOPE:
                     {
                         // Base geometry, dir 0: low edge at +Z (front), high edge at -Z (back)
+                        
                         Vertex b0 = {-0.5f, -0.5f,  0.5f, 0, 1};
                         Vertex b1 = { 0.5f, -0.5f,  0.5f, 1, 1};
                         Vertex b2 = { 0.5f, -0.5f, -0.5f, 1, 0};
