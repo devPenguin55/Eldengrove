@@ -424,7 +424,6 @@ int randomRange(int min, int max, int x, int y, int z, int seed) {
 }
 
 void transformChunkIntoNightChunk(Chunk *chunk) {
-    // creates tunnels from player's position
     int chunkXUnit = ChunkWidthX * BlockWidthX;
     int chunkZUnit = ChunkLengthZ * BlockLengthZ;
 
@@ -635,34 +634,24 @@ static inline int checkIfFaceValidToBeInMesh(Block *mainBlock, Block *neighborBl
             int offsetX = neighborBlock->x - mainBlock->x;
             int offsetY = neighborBlock->y - mainBlock->y;
             int offsetZ = neighborBlock->z - mainBlock->z;
-
             int slopeDir = neighborBlock->isSlope;
 
-            // Determine which face of the normal block touches the slope.
-            if (offsetX == 1 || offsetX == -1)
-            {
-                // Left/right face
-                if (slopeDir == 1 || slopeDir == 3)
-                    return 1;
-
+            // return 1;
+            // bottom face of slope deleted if the nblock is a slope and solid below
+            if (offsetY == 1)
                 return 0;
-            }
 
-            if (offsetZ == 1 || offsetZ == -1)
-            {
-                // Front/back face
-                if (slopeDir == 2 || slopeDir == 4)
-                    return 1;
-
+            // Back face of the slope
+            if ((slopeDir == 1 && offsetX == -1) ||
+                // (slopeDir == 2 && offsetX == 1) ||
+                (slopeDir == 3 && offsetX == -1) ||0)
+                // (slopeDir == 4 && offsetX == -1))
                 return 0;
-            }
 
-            if (offsetY == 1 || offsetY == -1)
-                return 1;
+            return 1;
         }
 
         return 0;
-
     }
 
     // water block
