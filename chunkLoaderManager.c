@@ -705,14 +705,15 @@ void loadChunks(GLfloat playerCoords[2])
                                 layersForTris[triCount++] = topLayer;
                             }
 
+                            
                             // left side
                             int leftX = x;
                             int leftZ = z;
 
                             if (dir == 0) leftX--;
-                            else if (dir == 1) leftZ--;
+                            else if (dir == 1) leftZ++;
                             else if (dir == 2) leftX++;
-                            else if (dir == 3) leftZ++;
+                            else if (dir == 3) leftZ--;
 
                             Block *leftBlock = blockAtPosition(leftX, y, leftZ);
 
@@ -734,9 +735,9 @@ void loadChunks(GLfloat playerCoords[2])
                             int rightZ = z;
 
                             if (dir == 0) rightX++;
-                            else if (dir == 1) rightZ++;
+                            else if (dir == 1) rightZ--;
                             else if (dir == 2) rightX--;
-                            else if (dir == 3) rightZ--;
+                            else if (dir == 3) rightZ++;
 
                             Block *rightBlock = blockAtPosition(rightX, y, rightZ);
 
