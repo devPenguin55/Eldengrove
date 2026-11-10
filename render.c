@@ -2604,7 +2604,7 @@ void buildWorldMesh()
                         int leftZ = z;
 
                         if (dir == 0) leftX--;
-                        else if (dir == 1) leftZ--;
+                        else if (dir == 1) leftZ++;
                         else if (dir == 2) leftX++;
                         else if (dir == 3) leftZ++;
 
@@ -2628,7 +2628,7 @@ void buildWorldMesh()
                         int rightZ = z;
 
                         if (dir == 0) rightX++;
-                        else if (dir == 1) rightZ++;
+                        else if (dir == 1) rightZ--;
                         else if (dir == 2) rightX--;
                         else if (dir == 3) rightZ--;
 

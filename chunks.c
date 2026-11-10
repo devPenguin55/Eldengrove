@@ -610,15 +610,15 @@ static inline int checkIfFaceValidToBeInMesh(Block *mainBlock, Block *neighborBl
     if (mainBlock->isAir)
         return 0;
 
-    if (!mainBlock->isAir && !neighborBlock->isAir && !blockRegistry[mainBlock->blockType].isRenderSolid && !blockRegistry[neighborBlock->blockType].isRenderSolid && mainBlock->blockType != BLOCK_TYPE_WATER && neighborBlock->blockType != BLOCK_TYPE_WATER)
+    if (!mainBlock->isAir && !neighborBlock->isAir && !mainBlock->isSlope && !neighborBlock->isSlope && !blockRegistry[mainBlock->blockType].isRenderSolid && !blockRegistry[neighborBlock->blockType].isRenderSolid && mainBlock->blockType != BLOCK_TYPE_WATER && neighborBlock->blockType != BLOCK_TYPE_WATER)
     {
         return 1;
     }
-    if (!mainBlock->isAir && !neighborBlock->isAir && blockRegistry[mainBlock->blockType].isRenderSolid && !blockRegistry[neighborBlock->blockType].isRenderSolid && mainBlock->blockType != BLOCK_TYPE_WATER && neighborBlock->blockType != BLOCK_TYPE_WATER)
+    if (!mainBlock->isAir && !neighborBlock->isAir && !mainBlock->isSlope && !neighborBlock->isSlope && blockRegistry[mainBlock->blockType].isRenderSolid && !blockRegistry[neighborBlock->blockType].isRenderSolid && mainBlock->blockType != BLOCK_TYPE_WATER && neighborBlock->blockType != BLOCK_TYPE_WATER)
     {
         return 1;
     }
-
+    
     // normal solid block
     if (mainBlock->blockType != BLOCK_TYPE_WATER)
     {
@@ -629,29 +629,41 @@ static inline int checkIfFaceValidToBeInMesh(Block *mainBlock, Block *neighborBl
         if (neighborBlock->blockType == BLOCK_TYPE_WATER)
             return 1;
 
-        if (neighborBlock->isSlope)
-        {
-            int offsetX = neighborBlock->x - mainBlock->x;
-            int offsetY = neighborBlock->y - mainBlock->y;
-            int offsetZ = neighborBlock->z - mainBlock->z;
-            int slopeDir = neighborBlock->isSlope;
+        
+        if (!mainBlock->isSlope && !neighborBlock->isSlope) { return 0; }
 
-            // return 1;
-            // bottom face of slope deleted if the nblock is a slope and solid below
-            if (offsetY == 1)
-                return 0;
+        int offsetX = neighborBlock->x - mainBlock->x;
+        int offsetY = neighborBlock->y - mainBlock->y;
+        int offsetZ = neighborBlock->z - mainBlock->z;
+        int slopeDir = neighborBlock->isSlope;
 
-            // Back face of the slope
-            if ((slopeDir == 1 && offsetX == -1) ||
-                // (slopeDir == 2 && offsetX == 1) ||
-                (slopeDir == 3 && offsetX == -1) ||0)
-                // (slopeDir == 4 && offsetX == -1))
-                return 0;
 
-            return 1;
+
+        return 1;
+        // bottom face of slope deleted if the nblock is a slope and solid below
+
+        // if ((mainBlock->isAir && !neighborBlock->isAir) || (!mainBlock->isAir && neighborBlock->isAir)) {
+        //     return 1;
+        // }
+
+        // if (mainBlock->isSlope) {
+        //     return 0;
+        // }
+
+        if (offsetY == 1 && offsetX == 0 && offsetZ == 0 && (!mainBlock->isAir && !neighborBlock->isAir)) {
+            return 0;
         }
 
-        return 0;
+        return 1;
+
+        // Back face of the slope
+        if ((slopeDir == 1 && offsetX == -1) ||
+            // (slopeDir == 2 && offsetX == 1) ||
+            (slopeDir == 3 && offsetX == -1) ||0)
+            // (slopeDir == 4 && offsetX == -1))
+            return 0;
+
+        return 1;
     }
 
     // water block
