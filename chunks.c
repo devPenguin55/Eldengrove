@@ -639,9 +639,18 @@ static inline int checkIfFaceValidToBeInMesh(Block *mainBlock, Block *neighborBl
 
         // bottom face of slope deleted if the nblock is a slope and solid below
 
-        // if (offsetY == 1 && offsetX == 0 && offsetZ == 0) {
-        //     return 0;
-        // }
+        if (offsetY == 1 && offsetX == 0 && offsetZ == 0) {
+            return 0;
+        }
+
+        if (mainBlock->isSlope == neighborBlock->isSlope) { return 0; }
+
+        if ((slopeDir == 1 && offsetZ == 1) ||
+        (slopeDir == 2 && offsetX == 1) ||
+        (slopeDir == 3 && offsetZ == -1) ||
+        (slopeDir == 4 && offsetX == -1)) 
+            return 0;
+
 
         return 1;
 

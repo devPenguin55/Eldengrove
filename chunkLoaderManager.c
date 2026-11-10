@@ -716,10 +716,11 @@ void loadChunks(GLfloat playerCoords[2])
                             else if (dir == 3) leftZ--;
 
                             Block *leftBlock = blockAtPosition(leftX, y, leftZ);
+                            Block *curBlock = blockAtPosition(x, y, z);
 
-                            if (!leftBlock || leftBlock->isAir ||
+                            if ((!leftBlock || leftBlock->isAir ||
                                 !blockRegistry[leftBlock->blockType].isRenderSolid ||
-                                leftBlock->isSlope)
+                                leftBlock->isSlope) && curBlock->isSlope != leftBlock->isSlope)
                             {
                                 Vertex leftTris[] = {tl0, tl2, tl1};
 
@@ -741,9 +742,9 @@ void loadChunks(GLfloat playerCoords[2])
 
                             Block *rightBlock = blockAtPosition(rightX, y, rightZ);
 
-                            if (!rightBlock || rightBlock->isAir ||
+                            if ((!rightBlock || rightBlock->isAir ||
                                 !blockRegistry[rightBlock->blockType].isRenderSolid ||
-                                rightBlock->isSlope)
+                                rightBlock->isSlope) && curBlock->isSlope != rightBlock->isSlope)
                             {
                                 Vertex rightTris[] = {tr0, tr2, tr1};
 
