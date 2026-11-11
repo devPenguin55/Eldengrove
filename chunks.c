@@ -653,15 +653,6 @@ static inline int checkIfFaceValidToBeInMesh(Block *mainBlock, Block *neighborBl
 
 
         return 1;
-
-        // Back face of the slope
-        if ((slopeDir == 1 && offsetX == -1) ||
-            // (slopeDir == 2 && offsetX == 1) ||
-            (slopeDir == 3 && offsetX == -1) ||0)
-            // (slopeDir == 4 && offsetX == -1))
-            return 0;
-
-        return 1;
     }
 
     // water block

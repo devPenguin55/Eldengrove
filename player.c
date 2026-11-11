@@ -145,7 +145,6 @@ float getSlopeHeight(Block* block, float x, float z)
 }
 
 int playerCollides(Player* player) { 
-    return 0;
     float minX = player->position.x - playerHalfWidth(player); 
     float maxX = player->position.x + playerHalfWidth(player); 
     float minY = player->position.y; 
@@ -299,8 +298,7 @@ void updatePlayerPhysics(Player* player)
     if (player->isOnGround == -1) {
         gravity = 0.0f;
     }
-    gravity = 0.0;
-    int slopeDirCur = slopeDir(player);
+
     player->velocity.y -= gravity * DELTA_TIME;
     
     player->isOnGround = 0;

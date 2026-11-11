@@ -13,6 +13,10 @@ out vec4 fragColor;
 
 uniform sampler2DArray blockTextures;
 uniform usamplerBuffer lightBuffer; // for all render chunks in one
+uniform vec3 cameraPosition;
+uniform vec3 fogColor;
+uniform float fogStart;
+uniform float fogEnd;
 
 #define FACE_TOP 1
 #define FACE_BOTTOM 2
@@ -58,6 +62,9 @@ float getLight(int x, int y, int z)
 
     int finalIndex = (fragIn.fragGpuLightIndex) * 32768 + localIndex;
 
+    if (localIndex < 0 || localIndex >= 32768) {
+        return 0.9;
+    }
 
     uint packedLightData = texelFetch(lightBuffer, finalIndex).r;
 
@@ -74,6 +81,12 @@ float getLight(int x, int y, int z)
     }
 
     return brightness;
+}
+
+float calculateFog(vec3 worldPos) {
+    float dist = length(worldPos - cameraPosition);
+
+    return clamp((fogEnd - dist) / (fogEnd - fogStart), 0.0, 1.0);
 }
 
 void main()
@@ -182,7 +195,11 @@ void main()
         
     }
 
-    
+    if (layer >= 0)
+    {
+        float fogFactor = calculateFog(fragIn.worldPos);
+        texColor.rgb = mix(fogColor, texColor.rgb, fogFactor);
+    }
 
     fragColor = texColor;
     

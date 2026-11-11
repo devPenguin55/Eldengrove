@@ -556,7 +556,7 @@ void handleUserMovement()
 
 
     // ! REMOVE 
-    player.velocity.y = 0.0f;
+    // player.velocity.y = 0.0f;
 
     // if (DEV_MODE) {
     if (pressedKeys['r'])
@@ -567,8 +567,8 @@ void handleUserMovement()
 
     if (pressedKeys['f'])
     {
-        player.velocity.y = -7.5f;
-        player.isOnGround = -1;
+        player.velocity.y = 0.0f;
+        player.isOnGround = 1;
     }
     // } else {
     if (pressedKeys[' '] && (player.isOnGround || player.isInWater))

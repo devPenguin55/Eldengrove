@@ -66,92 +66,84 @@ void main()
     if (!((geomIn[0].fragFace == FACE_TOP || geomIn[0].fragFace == FACE_SLOPE)&& geomIn[0].fragLayer == 1))
     {
         return;
-    } else if (distance(playerPosition, geomIn[0].worldPos) > 20) {
+    }
+    
+    if (dot(playerPosition - geomIn[0].worldPos, playerPosition - geomIn[0].worldPos) > 400) {
         return;
     }
 
-    float playerDistanceSquared = dot(
-        playerPosition - geomIn[0].worldPos,
-        playerPosition - geomIn[0].worldPos
-    );
+    int grassCount = 8;
 
-    int grassCount = playerDistanceSquared < 900.0 ? 24 :
-                    playerDistanceSquared < 3600.0 ? 8 :
-                    playerDistanceSquared < 10000.0 ? 3 : 0;
+    vec3 p0 = geomIn[0].worldPos;
+    vec3 p1 = geomIn[1].worldPos;
+    vec3 p2 = geomIn[2].worldPos;
 
-    if (grassCount > 0)
+    vec3 faceNormal = vec3(0.0, 1.0, 0.0);
+    vec3 right = vec3(1.0, 0.0, 0.0);
+
+    for (int j = 0; j < grassCount; j++)
     {
-        vec3 p0 = geomIn[0].worldPos;
-        vec3 p1 = geomIn[1].worldPos;
-        vec3 p2 = geomIn[2].worldPos;
+        vec2 randomSeed = p0.xz + vec2(
+            float(j) * 17.31,
+            float(j) * 43.17
+        );
 
-        vec3 faceNormal = vec3(0.0, 1.0, 0.0);
-        vec3 right = vec3(1.0, 0.0, 0.0);
+        float r1 = hash(randomSeed);
+        float r2 = hash(randomSeed + 13.37);
 
-        for (int j = 0; j < grassCount; j++)
+        float sqrtR1 = sqrt(r1);
+
+        float a = 1.0 - sqrtR1;
+        float b = sqrtR1 * (1.0 - r2);
+        float c = sqrtR1 * r2;
+
+        vec3 base = p0 * a + p1 * b + p2 * c;
+
+        float h = mix(0.05, 0.15, fract(r1 * 17.13));
+        float width = mix(0.015, 0.035, fract(r2 * 23.71));
+        float angle = r1 * 6.2831853;
+        float windPhase = r2 * 6.2831853;
+
+        vec3 bladeRight = vec3(
+            cos(angle),
+            0.0,
+            sin(angle)
+        ) * width;
+
+        float sway = sin(
+            time * 2.0 +
+            windPhase +
+            base.x * 0.7 +
+            base.z * 0.7
+        ) * 0.05;
+
+        vec3 tip = base + faceNormal * h * 2.0;
+        tip += right * sway;
+
+        base += faceNormal * 0.005;
+
+        vec3 verts[4] = vec3[](
+            base - bladeRight * 3.0,
+            base + bladeRight * 3.0,
+            tip - bladeRight * 0.75,
+            tip + bladeRight * 0.75
+        );
+
+        for (int i = 0; i < 4; i++)
         {
-            vec2 randomSeed = p0.xz + vec2(
-                float(j) * 17.31,
-                float(j) * 43.17
-            );
+            gl_Position = gl_ModelViewProjectionMatrix *
+                        vec4(verts[i], 1.0);
 
-            float r1 = hash(randomSeed);
-            float r2 = hash(randomSeed + 13.37);
+            geomOut.fragUV = vec2(0.9, 0.9);
+            geomOut.fragLayer = FACE_GRASS;
+            geomOut.worldPos = verts[i];
+            geomOut.fragGpuLightIndex =
+                geomIn[0].fragGpuLightIndex;
+            geomOut.fragFace = FACE_GRASS;
 
-            float sqrtR1 = sqrt(r1);
-
-            float a = 1.0 - sqrtR1;
-            float b = sqrtR1 * (1.0 - r2);
-            float c = sqrtR1 * r2;
-
-            vec3 base = p0 * a + p1 * b + p2 * c;
-
-            float h = mix(0.05, 0.15, fract(r1 * 17.13));
-            float width = mix(0.015, 0.035, fract(r2 * 23.71));
-            float angle = r1 * 6.2831853;
-            float windPhase = r2 * 6.2831853;
-
-            vec3 bladeRight = vec3(
-                cos(angle),
-                0.0,
-                sin(angle)
-            ) * width;
-
-            float sway = sin(
-                time * 2.0 +
-                windPhase +
-                base.x * 0.7 +
-                base.z * 0.7
-            ) * 0.05;
-
-            vec3 tip = base + faceNormal * h * 2.0;
-            tip += right * sway;
-
-            base += faceNormal * 0.005;
-
-            vec3 verts[4] = vec3[](
-                base - bladeRight * 3.0,
-                base + bladeRight * 3.0,
-                tip - bladeRight * 0.75,
-                tip + bladeRight * 0.75
-            );
-
-            for (int i = 0; i < 4; i++)
-            {
-                gl_Position = gl_ModelViewProjectionMatrix *
-                            vec4(verts[i], 1.0);
-
-                geomOut.fragUV = vec2(0.9, 0.9);
-                geomOut.fragLayer = FACE_GRASS;
-                geomOut.worldPos = verts[i];
-                geomOut.fragGpuLightIndex =
-                    geomIn[0].fragGpuLightIndex;
-                geomOut.fragFace = FACE_GRASS;
-
-                EmitVertex();
-            }
-
-            EndPrimitive();
+            EmitVertex();
         }
+
+        EndPrimitive();
     }
 }

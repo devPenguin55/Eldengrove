@@ -3309,8 +3309,31 @@ void drawGraphics()
 
     buildWorldMesh(); // fills worldVertices and worldVertexCount
 
-    // printf("%f %f %f\n", player.position.x, player.position.y, player.position.z);
     glUseProgram(worldShader);
+    // printf("%f %f %f\n", player.position.x, player.position.y, player.position.z);
+    glUniform3f(
+        glGetUniformLocation(worldShader, "cameraPosition"),
+        player.position.x,
+        player.position.y,
+        player.position.z
+    );
+
+    glUniform3f(
+        glGetUniformLocation(worldShader, "fogColor"),
+        result[0],
+        result[1],
+        result[2]
+    );
+
+    glUniform1f(
+        glGetUniformLocation(worldShader, "fogStart"),
+        0.0f
+    );
+
+    glUniform1f(
+        glGetUniformLocation(worldShader, "fogEnd"),
+        90.0f
+    );
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D_ARRAY, blockTextureArray);
@@ -3651,7 +3674,7 @@ void drawGraphics()
 
     // switch the content of color and depth buffers
     glutSwapBuffers();
-    printf("%f\n", player.position.y);
+    // printf("%f\n", player.position.y);
     if (userBlockBreakingTimeElapsed != -1.f)
     {
         userBlockBreakingTimeElapsed += DELTA_TIME;
@@ -3674,7 +3697,7 @@ void drawGraphics()
 
         // !
         
-        // transformChunkIntoNightChunk(selectedBlockToRender.chunk);
+        transformChunkIntoNightChunk(selectedBlockToRender.chunk);
         // player.position.y = 65.0f;
         
         // !
