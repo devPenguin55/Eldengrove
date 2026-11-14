@@ -568,7 +568,7 @@ void handleUserMovement()
     if (pressedKeys['f'])
     {
         player.velocity.y = 0.0f;
-        player.isOnGround = 1;
+        player.isOnGround = -1;
     }
     // } else {
     if (pressedKeys[' '] && (player.isOnGround || player.isInWater))

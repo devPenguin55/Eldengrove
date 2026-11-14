@@ -3188,6 +3188,9 @@ void drawGraphics()
         }
         blend = MIN(blend, 1.0f);
     } else if (t < (M_PI + 0.5f)) {
+        if (dayNightPhase != SUNSET) {
+            transformChunkIntoNightChunk(selectedBlockToRender.chunk);
+        }
         // sunset
         dayNightPhase = SUNSET;
         colorA = skyBlue;
@@ -3510,7 +3513,7 @@ void drawGraphics()
     {
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        float depthAlpha = MAX(MIN((SEA_LEVEL + 2 - eyeY) / 25, 0.55), 0.25);
+        float depthAlpha = MAX(MIN((SEA_LEVEL + 2 - eyeY) / 25, 0.0), 0.05);
         glColor4f(0.0f, 0.3f, 0.8f, depthAlpha);
         glBegin(GL_QUADS);
         glVertex2f(0, 0);
@@ -3693,14 +3696,6 @@ void drawGraphics()
 
         // break blocks
         int blockType = selectedBlockToRender.chunk->blocks[x + (ChunkWidthX)*z + (ChunkWidthX * ChunkLengthZ) * y].blockType;
-        
-
-        // !
-        
-        transformChunkIntoNightChunk(selectedBlockToRender.chunk);
-        // player.position.y = 65.0f;
-        
-        // !
 
 
         if (userBlockBreakingTimeElapsed >= blockRegistry[blockType].blockBreakingTime && beginBlockBreakingIndex == (x + (ChunkWidthX)*z + (ChunkWidthX * ChunkLengthZ) * y))

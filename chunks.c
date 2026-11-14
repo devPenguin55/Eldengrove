@@ -500,7 +500,10 @@ void transformChunkIntoNightChunk(Chunk *chunk) {
                             } else {
                                 cx -= fetchedChunk->chunkStartX;
                                 cz -= fetchedChunk->chunkStartZ;
-                                fetchedChunk->blocks[cx + cz * ChunkWidthX + cy * ChunkWidthX * ChunkLengthZ].isAir = 1;
+                                Block *block = &fetchedChunk->blocks[cx + cz * ChunkWidthX + cy * ChunkWidthX * ChunkLengthZ];
+                                
+                                block->isSlope = 0;
+                                block->isAir = 1;
                                 triggerRenderChunkRebuild(fetchedChunk);
 
                                 if (cx == 0) {
@@ -655,7 +658,7 @@ static inline int checkIfFaceValidToBeInMesh(Block *mainBlock, Block *neighborBl
         return 1;
     }
 
-    // water block
+    // water block 
     if (mainBlock->blockType == BLOCK_TYPE_WATER)
     {
         // only render water surface

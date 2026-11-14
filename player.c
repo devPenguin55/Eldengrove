@@ -294,7 +294,7 @@ void updatePlayerPhysics(Player* player)
 {
     if (totTime < 5.0) { totTime += DELTA_TIME; return; }
 
-    float gravity = (player->isInWater) ? (5.0f) : (20.0f);
+    float gravity = (player->isInWater) ? (2.5f) : (20.0f);
     if (player->isOnGround == -1) {
         gravity = 0.0f;
     }
@@ -364,9 +364,8 @@ void updatePlayerPhysics(Player* player)
 void updateEntityPhysics(Entity *entity)
 {
     if (totTime < 5.0) { return; }
-    float gravity = (entity->isInWater) ? (5.0f) : (20.0f);
+    float gravity = (entity->isInWater) ? (2.50f) : (20.0f);
 
-    int slopeDirCur = slopeDirEntity(entity);
     entity->velocity.y -= gravity * DELTA_TIME;
     
     entity->isOnGround = 0;
@@ -415,7 +414,7 @@ void updateEntityPhysics(Entity *entity)
             while (entityCollides(entity))
             {
                 entity->position.y += 0.001f;
-                if (entity->position.y - startY > 2.0f)
+                if (entity->position.y - startY > 100.0f)
                 {
                     entity->position.y = startY;
                     break;

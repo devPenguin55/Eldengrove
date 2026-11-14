@@ -562,122 +562,81 @@ void worldEntityUpdate() {
     for (int i = 0; i < worldEntities.amtEntities; i++) {
         Entity *curEntity = &worldEntities.entities[i];
         curEntity->isInWater = heightInWater(&curEntity->position);
+
+        Vec3 targetPathPoint;
         
-        // apply movement code in terms of the velocity before the physics apply
-        // * Note that if the entity stops moving after a collision, that's because it needs velocity inputs before physics calculations
-        // if (curEntity->isOnGround && curEntity->path == NULL) {
-        //     aStarPathfinding(curEntity, &player.position);
-        //     // printf("completed the astar pathfinding with path length %d", curEntity->pathLength);
-        //     curEntity->pathIndex = 0;
-        // }
 
-        // if (curEntity->path && curEntity->pathIndex < curEntity->pathLength) {
-        //     Vec3 newPos = curEntity->path[curEntity->pathIndex++];
-        //     curEntity->velocity.x = newPos.x - curEntity->position.x;
-        //     curEntity->velocity.y = newPos.y - curEntity->position.y;
-        //     curEntity->velocity.z = newPos.z - curEntity->position.z;
-        // } else if (curEntity->path && curEntity->pathIndex == curEntity->pathLength) {
-        //     curEntity->velocity.x = 0;
-        //     curEntity->velocity.y = 0;
-        //     curEntity->velocity.z = 0;
-        //     aStarPathfinding(curEntity, &player.position);
-        //     // printf("completed the astar pathfinding with path length %d", curEntity->pathLength);
-        //     curEntity->pathIndex = 0;
-        // }
 
-        if (1)
-        {
-            Vec3 targetPathPoint;
-            targetPathPoint.x = curEntity->position.x;
-            targetPathPoint.y = curEntity->position.y;
-            targetPathPoint.z = curEntity->position.z;
-            if (curEntity->path == NULL || curEntity->pathIndex >= curEntity->pathLength || 1)
-            {
-                aStarPathfinding(curEntity,&player.position);
-                if (curEntity->pathLength <= 0) {
-                    if (curEntity->pathLength == -1) {                      
+        aStarPathfinding(curEntity,&player.position);
+        int editedNewPath = 0;
+        if (curEntity->pathLength <= 0) {
+            if (curEntity->pathLength == -1) {                      
+                targetPathPoint.x = curEntity->position.x;
+                targetPathPoint.y = curEntity->position.y;
+                targetPathPoint.z = curEntity->position.z;                        
+            } else {
+                // here, we don't have a direct path so just jump and move in player's direction
+                int dirX = ((curEntity->position.x - player.position.x) < 0) * 2 - 1;
+                int dirZ = ((curEntity->position.z - player.position.z) < 0) * 2 - 1;
+                int nx = (int)(curEntity->position.x) + dirX;
+                int ny = (int)(curEntity->position.y);
+                int nz = (int)(curEntity->position.z) + dirZ;
+                if (ny >= 0 && ny < ChunkHeightY) {
+                    editedNewPath = 1;
+                    Block *nBlock = blockAtPosition(nx, ny, nz);
+                    Block *curBlock = blockAtPosition((int)(curEntity->position.x), (int)(curEntity->position.y), (int)(curEntity->position.z));
+                    if (blockAtPosition((int)(curEntity->position.x), (int)(curEntity->position.y)+1, (int)(curEntity->position.z))->isAir && !curBlock->isAir) {
+                        targetPathPoint.x = curEntity->position.x;
+                        targetPathPoint.z = curEntity->position.z;
+                        targetPathPoint.y = curEntity->position.y+1;
+                    } else if (!nBlock->isAir && !curBlock->isAir) {
+                        targetPathPoint.x = nx;
+                        targetPathPoint.z = nz;
+                    } else if (nBlock->isAir && !curBlock->isAir) {
+                        targetPathPoint.x = nx;
+                        targetPathPoint.y = nBlock->y;
+                        targetPathPoint.z = nz;
+                    } else if (nBlock->isAir && curBlock->isAir) {
+                        targetPathPoint.x = nx;
+                        targetPathPoint.y = curEntity->position.y-1;
+                        targetPathPoint.z = nz;
+                    } else {
                         targetPathPoint.x = curEntity->position.x;
                         targetPathPoint.y = curEntity->position.y;
-                        targetPathPoint.z = curEntity->position.z;                        
-                    } else {
-                        // here, we don't have a direct path so just jump and move in player's direction
-                        int dirX = ((curEntity->position.x - player.position.x) < 0) * 2 - 1;
-                        int dirZ = ((curEntity->position.z - player.position.z) < 0) * 2 - 1;
-                        int nx = (int)(curEntity->position.x) + dirX;
-                        int ny = (int)(curEntity->position.y);
-                        int nz = (int)(curEntity->position.z) + dirZ;
-                        if (ny >= 0 && ny < ChunkHeightY) {
-                            Block *nBlock = blockAtPosition(nx, ny, nz);
-                            Block *curBlock = blockAtPosition((int)(curEntity->position.x), (int)(curEntity->position.y), (int)(curEntity->position.z));
-                            if (!nBlock->isAir && !curBlock->isAir) {
-                                targetPathPoint.x = nx;
-                                targetPathPoint.z = nz;
-                                // targetPathPoint.y += 1;
-                            } else if (nBlock->isAir && !curBlock->isAir) {
-                                targetPathPoint.x = nx;
-                                targetPathPoint.y = nBlock->y;
-                                targetPathPoint.z = nz;
-                            } else if (nBlock->isAir && curBlock->isAir) {
-                                targetPathPoint.x = nx;
-                                targetPathPoint.y--;
-                                targetPathPoint.z = nz;
-                            } else if (blockAtPosition(nx, ny+1, nz)->isAir && !curBlock->isAir) {
-                                targetPathPoint.x = nx;
-                                targetPathPoint.z = nz;
-                                targetPathPoint.y += 1;
-                            } else {
-                                targetPathPoint.x = curEntity->position.x;
-                                targetPathPoint.y = curEntity->position.y;
-                                targetPathPoint.z = curEntity->position.z;
-                            }
-                            // printf("%d %d %d \n", !nBlock->isAir, !curBlock->isAir, blockAtPosition(nx, ny+1, nz)->isAir, targetPathPoint.y);
-                        }
+                        targetPathPoint.z = curEntity->position.z;
                     }
-                }
-                curEntity->pathIndex = 1;
+                    
+                    // printf("%d %d %d \n", !nBlock->isAir, !curBlock->isAir, blockAtPosition(nx, ny+1, nz)->isAir, targetPathPoint.y);
+                } 
+                
+
+                
             }
-
-            if ((int)totEntityTime % 1 == 0 && totEntityTime > 1.0f)
-            {
-                if (curEntity->pathLength > 0 && curEntity->path && curEntity->pathIndex < curEntity->pathLength) {
-                    targetPathPoint = curEntity->path[curEntity->pathIndex];
-                }
-
-                // float dx = target.x - curEntity->position.x;
-                // float dy = target.y - curEntity->position.y;
-                // float dz = target.z - curEntity->position.z;
-                curEntity->position = targetPathPoint;
-
-                // float distance = sqrtf(dx * dx + dy * dy + dz * dz);
-
-                // if (distance < 0.1f)
-                // {
-                //     curEntity->pathIndex++;
-
-                //     if (curEntity->pathIndex >= curEntity->pathLength)
-                //     {
-                //         free(curEntity->path);
-                //         curEntity->path = NULL;
-
-                        curEntity->velocity.x = 0;
-                        curEntity->velocity.y = 0;
-                        curEntity->velocity.z = 0;
-                //     }
-                // }
-                // else
-                // {
-                //     curEntity->velocity.x = dx;
-                //     curEntity->velocity.y = dy;
-                //     curEntity->velocity.z = dz;
-                // }
-                curEntity->pathIndex++;
-            }
-            // printf("ended pathfinding\n");
         }
-        // printf("%f %f %f\n", curEntity->velocity.x, curEntity->velocity.y, curEntity->velocity.z);
         
+        curEntity->pathIndex = 1;
+
+        if ((curEntity->pathLength > 0 && curEntity->path && curEntity->pathIndex < curEntity->pathLength) || editedNewPath) {
+            if (!editedNewPath) {
+                targetPathPoint = curEntity->path[curEntity->pathIndex];
+            }
+            float dx = targetPathPoint.x - curEntity->position.x;
+            float dy = targetPathPoint.y - curEntity->position.y;
+            float dz = targetPathPoint.z - curEntity->position.z;
+            
+            // printf("setting the velocity %f %f %f\n", dx, dy, dz);
+            curEntity->velocity.x = dx*2;
+            curEntity->velocity.y = dy*2;
+            curEntity->velocity.z = dz*2;
+            if (dy > 0) {
+                curEntity->velocity.y = 7.5f;
+            }
+        }
+        printf("path idx %d path length %d editednewPath %d %f\n", curEntity->pathIndex, curEntity->pathLength, editedNewPath, DELTA_TIME);
+
+        updateEntityPhysics(curEntity);
+        printf("%f %f %f\n", curEntity->velocity.x, curEntity->velocity.y, curEntity->velocity.z);
         
-        // TODO -> add in the functionality for interpolating between the points in the entity movement code
         AnimatedModel *model = &modelManager.animatedModels[curEntity->animatedModelIndex];
         updateAnimatedModelInstanceTransformOnly(
             model,
