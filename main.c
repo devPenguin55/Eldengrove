@@ -21,7 +21,7 @@ int main(int argc, char *argv[]) {
     glutInitWindowSize(500, 500);
     glutInitWindowPosition(1000, 400);
     glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH); // rgb model, double buffer -> (color, depth)
-    glutCreateWindow("Minecraft");
+    glutCreateWindow("Eldengrove");
     glewInit();
     glutSetCursor(GLUT_CURSOR_NONE);
  

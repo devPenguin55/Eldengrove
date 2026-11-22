@@ -3188,9 +3188,12 @@ void drawGraphics()
         }
         blend = MIN(blend, 1.0f);
     } else if (t < (M_PI + 0.5f)) {
-        if (dayNightPhase != SUNSET) {
-            transformChunkIntoNightChunk(selectedBlockToRender.chunk);
-        }
+        // if (dayNightPhase != SUNSET) {
+        //     transformChunkIntoNightChunk(selectedBlockToRender.chunk);
+        //     lastTime = currentTime;
+        //     currentTime = glutGet(GLUT_ELAPSED_TIME) / 1000.0;
+        //     DELTA_TIME = 0.0f;
+        // }
         // sunset
         dayNightPhase = SUNSET;
         colorA = skyBlue;

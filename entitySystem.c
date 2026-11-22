@@ -386,7 +386,7 @@ void aStarPathfinding(Entity *entity, Vec3 *targetPosition)
 
     pqPush(&openSet, start);
      
-    float maxDist = 15.0f;
+    float maxDist =  30.0f;
     int collisionCount = 0;
     int closedCount = 0;
     int distanceCount = 0;
@@ -440,7 +440,7 @@ void aStarPathfinding(Entity *entity, Vec3 *targetPosition)
             int neighborX = current.position.x + dx;
             int neighborZ = current.position.z + dz;
             float neighborY = getWalkableY(entity, neighborX, current.position.y, neighborZ);
-            if (neighborY < 0) { continue; }
+            if (neighborY < 0 || neighborY > ChunkHeightY-1) { continue; }
             
             int dy = neighborY - current.position.y;
             if (blockAtPosition(neighborX, (int)round(neighborY)-1, neighborZ)->blockType == BLOCK_TYPE_WATER) {
@@ -589,6 +589,8 @@ void worldEntityUpdate() {
                         targetPathPoint.x = curEntity->position.x;
                         targetPathPoint.z = curEntity->position.z;
                         targetPathPoint.y = curEntity->position.y+1;
+                        // !!
+                        printf("jump condition ");// !!
                     } else if (!nBlock->isAir && !curBlock->isAir) {
                         targetPathPoint.x = nx;
                         targetPathPoint.z = nz;
@@ -596,14 +598,32 @@ void worldEntityUpdate() {
                         targetPathPoint.x = nx;
                         targetPathPoint.y = nBlock->y;
                         targetPathPoint.z = nz;
-                    } else if (nBlock->isAir && curBlock->isAir) {
-                        targetPathPoint.x = nx;
-                        targetPathPoint.y = curEntity->position.y-1;
-                        targetPathPoint.z = nz;
-                    } else {
+                        
+                    } else if (blockAtPosition((int)(curEntity->position.x), (int)(curEntity->position.y)-1, (int)(curEntity->position.z))->isAir && curBlock->isAir) {
                         targetPathPoint.x = curEntity->position.x;
-                        targetPathPoint.y = curEntity->position.y;
+                        targetPathPoint.y = curEntity->position.y-1;
                         targetPathPoint.z = curEntity->position.z;
+                    } else {
+                        if (blockAtPosition((int)(curEntity->position.x)+dirX, (int)(curEntity->position.y), (int)(curEntity->position.z))->isAir) {
+                            targetPathPoint.x = curEntity->position.x+dirX;
+                            targetPathPoint.z = curEntity->position.z;
+                            targetPathPoint.y = curEntity->position.y;
+                        } else if (blockAtPosition((int)(curEntity->position.x), (int)(curEntity->position.y), (int)(curEntity->position.z)+dirZ)->isAir) {
+                            targetPathPoint.x = curEntity->position.x;
+                            targetPathPoint.z = curEntity->position.z+dirZ;
+                            targetPathPoint.y = curEntity->position.y;
+                        } else if (blockAtPosition((int)(curEntity->position.x), (int)(curEntity->position.y)+1, (int)(curEntity->position.z))->isAir) {
+                            targetPathPoint.x = curEntity->position.x;
+                            targetPathPoint.z = curEntity->position.z;
+                            targetPathPoint.y = curEntity->position.y+1;
+                            
+                            printf("jump condition relaxed");// !!
+                        } else {
+                            printf("true do nothing condition");
+                            targetPathPoint.x = curEntity->position.x;
+                            targetPathPoint.z = curEntity->position.z;
+                            targetPathPoint.y = curEntity->position.y;
+                        }
                     }
                     
                     // printf("%d %d %d \n", !nBlock->isAir, !curBlock->isAir, blockAtPosition(nx, ny+1, nz)->isAir, targetPathPoint.y);
@@ -629,13 +649,68 @@ void worldEntityUpdate() {
             curEntity->velocity.y = dy*2;
             curEntity->velocity.z = dz*2;
             if (dy > 0) {
-                curEntity->velocity.y = 7.5f;
+                curEntity->velocity.y = 7.5f*2;
+                int cx = (int)round(curEntity->position.x+curEntity->velocity.x);
+                int cy = (int)round(curEntity->position.y);
+                int cz = (int)round(curEntity->position.z+curEntity->velocity.z);
+                Block *b = blockAtPosition(cx, cy, cz);
+                if (b->isAir) {
+                    b->isAir = 0;
+                    b->isSlope = 0;
+                    b->blockType = BLOCK_TYPE_OAK;
+                    int chunkXUnit = ChunkWidthX * BlockWidthX;
+                    int chunkZUnit = ChunkLengthZ * BlockLengthZ;
+                    Chunk *fetchedChunk = chunkAtPosition(cx, cy, cz);
+                    triggerRenderChunkRebuild(fetchedChunk);
+                    cx -= fetchedChunk->chunkStartX;
+                    cz -= fetchedChunk->chunkStartZ;
+
+                    if (cx == 0) {
+                        uint64_t chunkKey = packChunkKey(
+                            (int)((fetchedChunk->chunkStartX - chunkXUnit) / (chunkXUnit)),
+                            (int)((fetchedChunk->chunkStartZ) / (chunkZUnit)));
+
+                        BucketEntry *result = getHashmapEntry(chunkKey);
+                        if (result != NULL) {
+                            triggerRenderChunkRebuild(result->chunkEntry);
+                        }
+                    } else if (cx == ChunkWidthX-1) {
+                        uint64_t chunkKey = packChunkKey(
+                            (int)((fetchedChunk->chunkStartX + chunkXUnit) / (chunkXUnit)),
+                            (int)((fetchedChunk->chunkStartZ) / (chunkZUnit)));
+
+                        BucketEntry *result = getHashmapEntry(chunkKey);
+                        if (result != NULL) {
+                            triggerRenderChunkRebuild(result->chunkEntry);
+                        }
+                    }
+
+                    if (cz == 0) {
+                        uint64_t chunkKey = packChunkKey(
+                            (int)((fetchedChunk->chunkStartX) / (chunkXUnit)),
+                            (int)((fetchedChunk->chunkStartZ - chunkZUnit) / (chunkZUnit)));
+
+                        BucketEntry *result = getHashmapEntry(chunkKey);
+                        if (result != NULL) {
+                            triggerRenderChunkRebuild(result->chunkEntry);
+                        }
+                    } else if (cz == ChunkLengthZ-1) {
+                        uint64_t chunkKey = packChunkKey(
+                            (int)((fetchedChunk->chunkStartX) / (chunkXUnit)),
+                            (int)((fetchedChunk->chunkStartZ + chunkZUnit) / (chunkZUnit)));
+
+                        BucketEntry *result = getHashmapEntry(chunkKey);
+                        if (result != NULL) {
+                            triggerRenderChunkRebuild(result->chunkEntry);
+                        }
+                    }
+                }
             }
         }
-        printf("path idx %d path length %d editednewPath %d %f\n", curEntity->pathIndex, curEntity->pathLength, editedNewPath, DELTA_TIME);
+        // printf("path idx %d path length %d editednewPath %d %f\n", curEntity->pathIndex, curEntity->pathLength, editedNewPath, DELTA_TIME);
 
         updateEntityPhysics(curEntity);
-        printf("%f %f %f\n", curEntity->velocity.x, curEntity->velocity.y, curEntity->velocity.z);
+        // printf("%f %f %f\n", curEntity->velocity.x, curEntity->velocity.y, curEntity->velocity.z);
         
         AnimatedModel *model = &modelManager.animatedModels[curEntity->animatedModelIndex];
         updateAnimatedModelInstanceTransformOnly(

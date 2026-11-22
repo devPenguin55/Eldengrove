@@ -401,7 +401,7 @@ void updateEntityPhysics(Entity *entity)
             while (entityCollides(entity))
             {
                 entity->position.y -= 0.001f;
-                if (startY - entity->position.y > 2.0f)
+                if (startY - entity->position.y > 5.0f)
                 {
                     entity->position.y = startY; // couldn't resolve - bail instead of falling forever
                     break;
