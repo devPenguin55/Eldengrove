@@ -25,7 +25,7 @@ uniform float fogEnd;
 #define FACE_FRONT 5
 #define FACE_BACK 6
 #define FACE_CROSS 7 // use for things like flowers
-#define FACE_SLOPE 8 // use for slopes
+#define FACE_SLOPE 8
 #define FACE_GRASS 9
 
 float getFaceShade(int face)

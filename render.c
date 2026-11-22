@@ -1400,8 +1400,8 @@ void initModelManager() {
 
     modelShader = glCreateProgram();
     
-    GLuint modelVS = compileShader("modelShader.vert", GL_VERTEX_SHADER);
-    GLuint modelFS = compileShader("modelShader.frag", GL_FRAGMENT_SHADER);
+    GLuint modelVS = compileShader("shaders/modelShader.vert", GL_VERTEX_SHADER);
+    GLuint modelFS = compileShader("shaders/modelShader.frag", GL_FRAGMENT_SHADER);
     glAttachShader(modelShader, modelVS);
     glAttachShader(modelShader, modelFS);
     
@@ -1418,8 +1418,8 @@ void initModelManager() {
      
     animatedModelShader = glCreateProgram();
 
-    GLuint animatedModelVS = compileShader("animatedModelShader.vert", GL_VERTEX_SHADER);
-    GLuint animatedModelFS = compileShader("animatedModelShader.frag", GL_FRAGMENT_SHADER);
+    GLuint animatedModelVS = compileShader("shaders/animatedModelShader.vert", GL_VERTEX_SHADER);
+    GLuint animatedModelFS = compileShader("shaders/animatedModelShader.frag", GL_FRAGMENT_SHADER);
     glAttachShader(animatedModelShader, animatedModelVS);
     glAttachShader(animatedModelShader, animatedModelFS);
 
@@ -1559,9 +1559,9 @@ void initGraphics()
 
     hotbarActiveSlot = 1;
 
-    GLuint vs = compileShader("shader.vert", GL_VERTEX_SHADER);
-    GLuint fs = compileShader("shader.frag", GL_FRAGMENT_SHADER);
-    gs = compileShader("shader.geom", GL_GEOMETRY_SHADER);
+    GLuint vs = compileShader("shaders/shader.vert", GL_VERTEX_SHADER);
+    GLuint fs = compileShader("shaders/shader.frag", GL_FRAGMENT_SHADER);
+    gs = compileShader("shaders/shader.geom", GL_GEOMETRY_SHADER);
 
     worldShader = glCreateProgram();
 
