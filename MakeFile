@@ -19,3 +19,14 @@ $(TARGET): $(SRC)
 
 clean:
 	del $(TARGET)
+
+# these are the dll files to include when doing the release
+# "libwinpthread-1.dll"
+# "libassimp-6.dll"
+# "libgcc_s_seh-1.dll"
+# "libstdc++-6.dll"
+# "libfreeglut.dll"
+# "libminizip-1.dll"
+# "zlib1.dll"
+# "libbz2-1.dll"
+# "glew32.dll"

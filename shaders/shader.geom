@@ -63,7 +63,7 @@ void main()
 
     EndPrimitive();
 
-    if (!(geomIn[0].fragFace == FACE_TOP || geomIn[0].fragFace == FACE_SLOPE))
+    if (!((geomIn[0].fragFace == FACE_TOP || geomIn[0].fragFace == FACE_SLOPE)&& geomIn[0].fragLayer == 1))
     {
         return;
     }
