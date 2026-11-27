@@ -115,6 +115,7 @@ typedef struct Queue
 #define BLOCK_TYPE_ORCHID 8
 #define BLOCK_TYPE_SHORT_GRASS 9
 #define BLOCK_TYPE_TORCH 10
+#define BLOCK_TYPE_ENTITY_PLACED 11
 
 #define ChunkWidthX 16
 #define ChunkLengthZ 16

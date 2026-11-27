@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#define ENTITY_MAX_SEARCH_DIST 30.0f
+
 WorldEntities worldEntities;
 
 
@@ -62,6 +64,8 @@ void createEntity(int animatedModelIndex, int curAnimationIndex, Vec3 *position,
     worldEntities.entities[worldEntities.amtEntities].size = size;
     worldEntities.entities[worldEntities.amtEntities].isOnGround = 0;
     worldEntities.entities[worldEntities.amtEntities].isInWater = heightInWater(position);
+    worldEntities.entities[worldEntities.amtEntities].pillarTimer = 0.0f;
+    worldEntities.entities[worldEntities.amtEntities].isInViewToRender = 1;
     worldEntities.entities[worldEntities.amtEntities].animatedModelInstanceIndex = createAnimatedModelInstance(&modelManager.animatedModels[animatedModelIndex], position, rotation, size, curAnimationIndex);
     worldEntities.entities[worldEntities.amtEntities].pathIndex = -1;
     worldEntities.entities[worldEntities.amtEntities].pathLength = -1;
@@ -353,6 +357,10 @@ void aStarPathfinding(Entity *entity, Vec3 *targetPosition)
     if (goalY < 0)
     {
         // printf("Target is not walkable\n");
+        free(entity->path);
+        entity->path = NULL;
+        entity->pathLength = 0;
+        entity->pathIndex = 0;
         return;
     }
 
@@ -385,8 +393,7 @@ void aStarPathfinding(Entity *entity, Vec3 *targetPosition)
     start.f = start.g + start.h;
 
     pqPush(&openSet, start);
-     
-    float maxDist =  30.0f;
+    
     int collisionCount = 0;
     int closedCount = 0;
     int distanceCount = 0;
@@ -452,7 +459,7 @@ void aStarPathfinding(Entity *entity, Vec3 *targetPosition)
 
             if (dxFromStart * dxFromStart +
                 dyFromStart * dyFromStart +
-                dzFromStart * dzFromStart > maxDist * maxDist) {
+                dzFromStart * dzFromStart > ENTITY_MAX_SEARCH_DIST * ENTITY_MAX_SEARCH_DIST) {
                     distanceCount++;
                     continue;
                 }
@@ -556,161 +563,174 @@ void aStarPathfinding(Entity *entity, Vec3 *targetPosition)
     entity->pathIndex = 0;
 }
 
-float totEntityTime = 0.0f;
+
+
+static int solidCell(int x, int y, int z) {
+    if (y < 0) return 1;
+    if (y >= ChunkHeightY) return 0;
+    Block *b = blockAtPosition(x, y, z);
+    return b == NULL || !b->isAir;
+}
+
+static void rebuildChunkAt(int chunkIdxX, int chunkIdxZ) {
+    BucketEntry *r = getHashmapEntry(packChunkKey(chunkIdxX, chunkIdxZ));
+    if (r != NULL) triggerRenderChunkRebuild(r->chunkEntry);
+}
+
+static void placeBlockAndRebuild(int x, int y, int z, int type) {
+    if (y < 0 || y >= ChunkHeightY) return;
+    Block *b = blockAtPosition(x, y, z);
+    if (b == NULL || !b->isAir) return;
+
+    b->isAir = 0;
+    b->isSlope = 0;
+    b->blockType = type;
+
+    Chunk *c = chunkAtPosition(x, y, z);
+    if (c == NULL) return;
+    triggerRenderChunkRebuild(c);
+
+    int chunkXUnit = ChunkWidthX * BlockWidthX;
+    int chunkZUnit = ChunkLengthZ * BlockLengthZ;
+    int ci = (int)(c->chunkStartX / chunkXUnit);
+    int cj = (int)(c->chunkStartZ / chunkZUnit);
+    int lx = x - c->chunkStartX;
+    int lz = z - c->chunkStartZ;
+
+    if (lx == 0)                    rebuildChunkAt(ci - 1, cj);
+    else if (lx == ChunkWidthX - 1) rebuildChunkAt(ci + 1, cj);
+    if (lz == 0)                    rebuildChunkAt(ci, cj - 1);
+    else if (lz == ChunkLengthZ-1)  rebuildChunkAt(ci, cj + 1);
+}
+
+static int collidesAt(Entity *e, float x, float y, float z) {
+    Entity t = *e;
+    t.position.x = x; t.position.y = y; t.position.z = z;
+    return entityCollides(&t);
+}
+
+static void fallbackSteer(Entity *e) {
+    Vec3 p = e->position;
+    float dx = player.position.x - p.x;
+    float dz = player.position.z - p.z;
+    float len = sqrtf(dx*dx + dz*dz);
+    float ux = (len > 0.001f) ? dx / len : 0.0f;
+    float uz = (len > 0.001f) ? dz / len : 0.0f;
+
+    int grounded   = collidesAt(e, p.x, p.y - 0.1f, p.z);
+    int blocked    = collidesAt(e, p.x + ux*0.6f, p.y,        p.z + uz*0.6f);
+    int clearAbove = !collidesAt(e, p.x + ux*0.6f, p.y + 1.0f, p.z + uz*0.6f);
+    int headroom   = !collidesAt(e, p.x, p.y + 1.0f, p.z);
+    float heightGap = player.position.y - p.y;
+
+    // want to go up if the player is higher and we're either under them
+    // or the obstacle ahead is too tall to hop
+    int needUp = heightGap > 1.0f && (len < 3.0f || (blocked && !clearAbove));
+
+    float speed = 3.0f;
+    e->velocity.x = 0.0f;
+    e->velocity.z = 0.0f;
+
+    if (needUp) {
+        // stay in the column while building
+        if (grounded && headroom) {
+            e->velocity.y = 7.5f * 2;
+            e->pillarTimer = 0.5f; // jump in progress
+        } else if (!grounded && e->pillarTimer > 0.0f && e->velocity.y <= 0.0f) {
+            // block under feet
+            int bx = (int)floorf(p.x);
+            int bz = (int)floorf(p.z);
+            int by = (int)floorf(p.y + 0.01f) - 1;
+            if (!solidCell(bx, by, bz)) {
+                placeBlockAndRebuild(bx, by, bz, BLOCK_TYPE_ENTITY_PLACED);
+            }
+            e->pillarTimer = 0.0f; // only one block for each jump
+        }
+        if (e->pillarTimer > 0.0f) e->pillarTimer -= DELTA_TIME;
+        return;
+    }
+
+    e->pillarTimer = 0.0f;
+
+    // towards player
+    if (len > 1.0f) {
+        e->velocity.x = ux * speed;
+        e->velocity.z = uz * speed;
+    }
+    // jump 1 blocks 
+    if (grounded && blocked && clearAbove && headroom) {
+        e->velocity.y = 7.5f * 2;
+    }
+}
+
 void worldEntityUpdate() {
-    totEntityTime += DELTA_TIME;
     for (int i = 0; i < worldEntities.amtEntities; i++) {
         Entity *curEntity = &worldEntities.entities[i];
+
+        if (
+            ((curEntity->position.x - player.position.x) * (curEntity->position.x - player.position.x) +
+            (curEntity->position.y - player.position.y) * (curEntity->position.y - player.position.y) +
+            (curEntity->position.z - player.position.z) * (curEntity->position.z - player.position.z)) > (ENTITY_MAX_SEARCH_DIST * ENTITY_MAX_SEARCH_DIST)
+        ) {
+            curEntity->isInViewToRender = 0;
+            AnimatedModel *model = &modelManager.animatedModels[curEntity->animatedModelIndex];
+            updateAnimatedModelInstanceTransformOnly(
+                model,
+                curEntity->animatedModelInstanceIndex,
+                &curEntity->position,
+                &curEntity->rotation,
+                0.0f
+            );
+            continue;
+        } else {
+            curEntity->isInViewToRender = 1;
+        }
+
         curEntity->isInWater = heightInWater(&curEntity->position);
 
-        Vec3 targetPathPoint;
-        
+        aStarPathfinding(curEntity, &player.position);
 
-
-        aStarPathfinding(curEntity,&player.position);
-        int editedNewPath = 0;
-        if (curEntity->pathLength <= 0) {
-            if (curEntity->pathLength == -1) {                      
-                targetPathPoint.x = curEntity->position.x;
-                targetPathPoint.y = curEntity->position.y;
-                targetPathPoint.z = curEntity->position.z;                        
-            } else {
-                // here, we don't have a direct path so just jump and move in player's direction
-                int dirX = ((curEntity->position.x - player.position.x) < 0) * 2 - 1;
-                int dirZ = ((curEntity->position.z - player.position.z) < 0) * 2 - 1;
-                int nx = (int)(curEntity->position.x) + dirX;
-                int ny = (int)(curEntity->position.y);
-                int nz = (int)(curEntity->position.z) + dirZ;
-                if (ny >= 0 && ny < ChunkHeightY) {
-                    editedNewPath = 1;
-                    Block *nBlock = blockAtPosition(nx, ny, nz);
-                    Block *curBlock = blockAtPosition((int)(curEntity->position.x), (int)(curEntity->position.y), (int)(curEntity->position.z));
-                    if (blockAtPosition((int)(curEntity->position.x), (int)(curEntity->position.y)+1, (int)(curEntity->position.z))->isAir && !curBlock->isAir) {
-                        targetPathPoint.x = curEntity->position.x;
-                        targetPathPoint.z = curEntity->position.z;
-                        targetPathPoint.y = curEntity->position.y+1;
-                        // !!
-                        printf("jump condition ");// !!
-                    } else if (!nBlock->isAir && !curBlock->isAir) {
-                        targetPathPoint.x = nx;
-                        targetPathPoint.z = nz;
-                    } else if (nBlock->isAir && !curBlock->isAir) {
-                        targetPathPoint.x = nx;
-                        targetPathPoint.y = nBlock->y;
-                        targetPathPoint.z = nz;
-                        
-                    } else if (blockAtPosition((int)(curEntity->position.x), (int)(curEntity->position.y)-1, (int)(curEntity->position.z))->isAir && curBlock->isAir) {
-                        targetPathPoint.x = curEntity->position.x;
-                        targetPathPoint.y = curEntity->position.y-1;
-                        targetPathPoint.z = curEntity->position.z;
-                    } else {
-                        if (blockAtPosition((int)(curEntity->position.x)+dirX, (int)(curEntity->position.y), (int)(curEntity->position.z))->isAir) {
-                            targetPathPoint.x = curEntity->position.x+dirX;
-                            targetPathPoint.z = curEntity->position.z;
-                            targetPathPoint.y = curEntity->position.y;
-                        } else if (blockAtPosition((int)(curEntity->position.x), (int)(curEntity->position.y), (int)(curEntity->position.z)+dirZ)->isAir) {
-                            targetPathPoint.x = curEntity->position.x;
-                            targetPathPoint.z = curEntity->position.z+dirZ;
-                            targetPathPoint.y = curEntity->position.y;
-                        } else if (blockAtPosition((int)(curEntity->position.x), (int)(curEntity->position.y)+1, (int)(curEntity->position.z))->isAir) {
-                            targetPathPoint.x = curEntity->position.x;
-                            targetPathPoint.z = curEntity->position.z;
-                            targetPathPoint.y = curEntity->position.y+1;
-                            
-                            printf("jump condition relaxed");// !!
-                        } else {
-                            printf("true do nothing condition");
-                            targetPathPoint.x = curEntity->position.x;
-                            targetPathPoint.z = curEntity->position.z;
-                            targetPathPoint.y = curEntity->position.y;
-                        }
-                    }
-                    
-                    // printf("%d %d %d \n", !nBlock->isAir, !curBlock->isAir, blockAtPosition(nx, ny+1, nz)->isAir, targetPathPoint.y);
-                } 
-                
-
-                
-            }
-        }
-        
         curEntity->pathIndex = 1;
 
-        if ((curEntity->pathLength > 0 && curEntity->path && curEntity->pathIndex < curEntity->pathLength) || editedNewPath) {
-            if (!editedNewPath) {
-                targetPathPoint = curEntity->path[curEntity->pathIndex];
-            }
-            float dx = targetPathPoint.x - curEntity->position.x;
-            float dy = targetPathPoint.y - curEntity->position.y;
-            float dz = targetPathPoint.z - curEntity->position.z;
-            
-            // printf("setting the velocity %f %f %f\n", dx, dy, dz);
+        if (curEntity->pathLength > 1 && curEntity->path) {
+            // real A* path: follow it (no block placing here)
+            Vec3 t = curEntity->path[1];
+            float dx = t.x - curEntity->position.x;
+            float dy = t.y - curEntity->position.y;
+            float dz = t.z - curEntity->position.z;
             curEntity->velocity.x = dx*2;
             curEntity->velocity.y = dy*2;
             curEntity->velocity.z = dz*2;
-            if (dy > 0) {
-                curEntity->velocity.y = 7.5f*2;
-                int cx = (int)round(curEntity->position.x+curEntity->velocity.x);
-                int cy = (int)round(curEntity->position.y);
-                int cz = (int)round(curEntity->position.z+curEntity->velocity.z);
-                Block *b = blockAtPosition(cx, cy, cz);
-                if (b->isAir) {
-                    b->isAir = 0;
-                    b->isSlope = 0;
-                    b->blockType = BLOCK_TYPE_OAK;
-                    int chunkXUnit = ChunkWidthX * BlockWidthX;
-                    int chunkZUnit = ChunkLengthZ * BlockLengthZ;
-                    Chunk *fetchedChunk = chunkAtPosition(cx, cy, cz);
-                    triggerRenderChunkRebuild(fetchedChunk);
-                    cx -= fetchedChunk->chunkStartX;
-                    cz -= fetchedChunk->chunkStartZ;
+            if (dy > 0) curEntity->velocity.y = 7.5f*2;
+            curEntity->pillarTimer = 0.0f;
+        } else if (curEntity->pathLength == 1) {
+            curEntity->velocity.x = 0.0f;
+            curEntity->velocity.z = 0.0f;
+        } else {
+            fallbackSteer(curEntity);
+        }
 
-                    if (cx == 0) {
-                        uint64_t chunkKey = packChunkKey(
-                            (int)((fetchedChunk->chunkStartX - chunkXUnit) / (chunkXUnit)),
-                            (int)((fetchedChunk->chunkStartZ) / (chunkZUnit)));
-
-                        BucketEntry *result = getHashmapEntry(chunkKey);
-                        if (result != NULL) {
-                            triggerRenderChunkRebuild(result->chunkEntry);
-                        }
-                    } else if (cx == ChunkWidthX-1) {
-                        uint64_t chunkKey = packChunkKey(
-                            (int)((fetchedChunk->chunkStartX + chunkXUnit) / (chunkXUnit)),
-                            (int)((fetchedChunk->chunkStartZ) / (chunkZUnit)));
-
-                        BucketEntry *result = getHashmapEntry(chunkKey);
-                        if (result != NULL) {
-                            triggerRenderChunkRebuild(result->chunkEntry);
-                        }
-                    }
-
-                    if (cz == 0) {
-                        uint64_t chunkKey = packChunkKey(
-                            (int)((fetchedChunk->chunkStartX) / (chunkXUnit)),
-                            (int)((fetchedChunk->chunkStartZ - chunkZUnit) / (chunkZUnit)));
-
-                        BucketEntry *result = getHashmapEntry(chunkKey);
-                        if (result != NULL) {
-                            triggerRenderChunkRebuild(result->chunkEntry);
-                        }
-                    } else if (cz == ChunkLengthZ-1) {
-                        uint64_t chunkKey = packChunkKey(
-                            (int)((fetchedChunk->chunkStartX) / (chunkXUnit)),
-                            (int)((fetchedChunk->chunkStartZ + chunkZUnit) / (chunkZUnit)));
-
-                        BucketEntry *result = getHashmapEntry(chunkKey);
-                        if (result != NULL) {
-                            triggerRenderChunkRebuild(result->chunkEntry);
-                        }
-                    }
-                }
+        if (curEntity->pillarTimer) {
+            int bx = (int)floorf(curEntity->position.x);
+            int bz = (int)floorf(curEntity->position.z);
+            int by = (int)floorf(curEntity->position.y + 0.01f) - 1;
+            if (!solidCell(bx, by, bz)) {
+                placeBlockAndRebuild(bx, by, bz, BLOCK_TYPE_ENTITY_PLACED);
             }
         }
-        // printf("path idx %d path length %d editednewPath %d %f\n", curEntity->pathIndex, curEntity->pathLength, editedNewPath, DELTA_TIME);
-
+        
         updateEntityPhysics(curEntity);
-        // printf("%f %f %f\n", curEntity->velocity.x, curEntity->velocity.y, curEntity->velocity.z);
+        curEntity->rotation.x = player.position.x - curEntity->position.x;
+        curEntity->rotation.z = player.position.z - curEntity->position.z;
+        float rlen = sqrtf(curEntity->rotation.x*curEntity->rotation.x + curEntity->rotation.z*curEntity->rotation.z);
+
+        if (rlen > 0.001f) {
+            curEntity->rotation.x = curEntity->rotation.x / rlen;
+            curEntity->rotation.z = curEntity->rotation.z / rlen;
+        }
+
+        curEntity->rotation.x *= -360.0f;
+        curEntity->rotation.z *= -360.0f;
         
         AnimatedModel *model = &modelManager.animatedModels[curEntity->animatedModelIndex];
         updateAnimatedModelInstanceTransformOnly(
@@ -721,11 +741,6 @@ void worldEntityUpdate() {
             curEntity->size
         );
     }
-
-    if ((int)totEntityTime % 1 == 0 && totEntityTime > 1.0f) {
-        totEntityTime = 0.0;
-    }
-    // printf("tot entity time: %f", totEntityTime);
 
     for (int animatedModelIndex = 0; animatedModelIndex < modelManager.amtAnimatedModels; animatedModelIndex++) {
         AnimatedModel *model = &modelManager.animatedModels[animatedModelIndex];

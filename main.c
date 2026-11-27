@@ -10,11 +10,14 @@
 #include "chunks.h"
 #include "chunkLoaderManager.h" 
 #include "worldDiskStorage.h"
+#include "audio.h"
 
 int main(int argc, char *argv[]) {
     initWorldDiskStorage();
     initChunkLoaderManager();
     initChunkMeshingSystem();
+
+    initAudio();
 
     glutInit(&argc, argv);
     

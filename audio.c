@@ -5,7 +5,7 @@
 ma_engine audioEngine;
 ma_sound currentMusic;
 
-void audioInit() {
+void initAudio() {
     ma_result result = ma_engine_init(NULL, &audioEngine);
     if (result != MA_SUCCESS) {
         printf("Failed to initialize audio engine\n");

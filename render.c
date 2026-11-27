@@ -1455,9 +1455,9 @@ void initModelManager() {
 
     initEntitySystem();
 
-    createEntity(ANIMATED_MODEL_INDEX_CLERIC, 1, &(Vec3){33.0f, 65.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, 1.0f);
-    // createEntity(ANIMATED_MODEL_INDEX_CLERIC, 3, &(Vec3){23.0f, 65.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, 0.8f);
-
+    createEntity(ANIMATED_MODEL_INDEX_CLERIC, 1, &(Vec3){33.0f, 85.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, &(Vec3){0.0f, 0.0f, 0.0f}, 1.0f);
+    
+    
 }
 
 void renderEntityBoundingBox(Entity *entity)
@@ -1621,7 +1621,8 @@ void initGraphics()
         "assets/leaves.png",      // 8
         "assets/blue_orchid.png", // 9
         "assets/short_grass.png", // 10
-        "assets/torch.png"        // 11
+        "assets/torch.png",       // 11
+        "assets/test.png"         // 12
     };
 
     int GRASS_SIDE_TEXTURE_ARRAY_INDEX = 0;
@@ -1636,6 +1637,7 @@ void initGraphics()
     int ORCHID_TEXTURE_ARRAY_INDEX = 9;
     int SHORT_GRASS_TEXTURE_ARRAY_INDEX = 10;
     int TORCH_TEXTURE_ARRAY_INDEX = 11;
+    int BLOCK_TYPE_ENTITY_PLACED_INDEX = 12;
 
     blockRegistry[BLOCK_TYPE_GRASS] = (BlockType){
         .id = BLOCK_TYPE_GRASS,
@@ -1755,6 +1757,18 @@ void initGraphics()
         .isRenderCross = 1,
         .isPhysicsSolid = 0,
         .lightEmissivePower = 15
+    };
+
+    blockRegistry[BLOCK_TYPE_ENTITY_PLACED] = (BlockType){
+        .id = BLOCK_TYPE_ENTITY_PLACED,
+        .sideTexture = BLOCK_TYPE_ENTITY_PLACED_INDEX,
+        .topTexture = BLOCK_TYPE_ENTITY_PLACED_INDEX,
+        .bottomTexture = BLOCK_TYPE_ENTITY_PLACED_INDEX,
+        .isRenderSolid = 0,
+        .blockBreakingTime = 0.1f,
+        .isRenderCross = 0,
+        .isPhysicsSolid = 1,
+        .lightEmissivePower = 0
     };
 
     blockTextureArray = loadTextureArray(blockTextures, sizeof(blockTextures) / sizeof(blockTextures[0]));

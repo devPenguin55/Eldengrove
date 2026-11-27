@@ -7,6 +7,7 @@
 #include "render.h"
 #include "chunkLoaderManager.h"
 #include "player.h"
+#include "audio.h"
 
 GLfloat PlayerDirX = -5;
 GLfloat PlayerDirY = 0;
@@ -562,6 +563,7 @@ void handleUserMovement()
     if (pressedKeys['r'])
     {
         player.velocity.y = 5.0f;
+        
     }
 
 
@@ -575,6 +577,7 @@ void handleUserMovement()
     {
         player.velocity.y = 7.5f;
         player.isOnGround = 0;
+        audioPlay("audio/coin.mp3");
     }
     // }
 

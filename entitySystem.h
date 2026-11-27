@@ -44,6 +44,8 @@ typedef struct Entity {
     Vec3 velocity;
     int isOnGround;
     int isInWater;
+    float pillarTimer;
+    int isInViewToRender;
 
     Vec3 *path;
     int pathLength;
