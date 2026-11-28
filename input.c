@@ -30,7 +30,7 @@ GLfloat eyeX;
 GLfloat eyeY;
 GLfloat eyeZ;
 
-const float blockMoveSpd = 2.5f;
+const float blockMoveSpd = 3.0f;
 
 int DEV_MODE = 0;
 

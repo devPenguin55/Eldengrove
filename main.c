@@ -11,6 +11,7 @@
 #include "chunkLoaderManager.h" 
 #include "worldDiskStorage.h"
 #include "audio.h"
+#include "sceneManager.h"
 
 int main(int argc, char *argv[]) {
     initWorldDiskStorage();
@@ -31,7 +32,7 @@ int main(int argc, char *argv[]) {
     initGraphics();
 
     glutReshapeFunc(reshape);
-    glutDisplayFunc(drawGraphics); 
+    glutDisplayFunc(drawScene); 
     glutKeyboardFunc(handleKeyDown);
     glutKeyboardUpFunc(handleKeyUp);
     glutIdleFunc(spinObject);

@@ -4,7 +4,7 @@
 #include <GL/glut.h>
 #include "chunks.h"
 #include "vectors.h"
-
+#include "entitySystem.h"
 
 #define MAX_BONE_INFLUENCE 4
 #define NIGHT 1
@@ -79,15 +79,6 @@ typedef struct ModelInstance {
     float rotation[3];
     float scale;
 } ModelInstance;
-
-// typedef struct AnimatedModelInstance{
-//     float position[3];
-//     float rotation[3];
-//     float scale;
-
-//     int animationIndex;
-//     float animationTime;
-// } AnimatedModelInstance;
 
 typedef struct Model {
     GLuint vao;
@@ -209,13 +200,15 @@ typedef struct ModelManager {
     AnimatedModel *animatedModels;
 } ModelManager;
 
-extern GLfloat T;
 extern GLfloat PlayerDirX;
 extern GLfloat PlayerDirY;
 extern GLfloat PlayerDirZ;
 extern SelectedBlockToRender selectedBlockToRender;
+extern GLuint destroyStageTextureArray[9];
 extern GLuint worldVBO;
 extern GLuint worldVAO;
+extern GLuint waterVBO;
+extern GLuint waterVAO;
 extern Vertex *worldVertices;
 extern int worldVertexCount;
 extern int worldVertexCapacity;
@@ -227,6 +220,17 @@ extern int hotbarActiveSlot;
 extern uint8_t *allChunkLighting;
 extern ModelManager modelManager;
 extern int dayNightPhase;
+extern double lastFpsTime;
+extern double lastTime;
+extern double fps;
+extern int frameCount;
+extern GLuint blockTextureArray;
+extern GLuint lightBuffer;
+extern GLuint lightTex;
+extern GLuint worldShader;
+extern GLuint gs;
+extern GLuint modelShader;
+extern GLuint animatedModelShader;
 
 void initGraphics();
 void createWorldLightingDataFromAllChunks();
@@ -277,6 +281,9 @@ void updateAnimatedModelInstanceTransformOnly(
 );
 void uploadBoneMatrices(AnimatedModel *model);
 void renderAnimatedModel(AnimatedModel *model);
+void uploadLighting();
+void renderEntityBoundingBox(Entity *entity);
+int isCameraInWater();
 void buildWorldMesh();
 void uploadWorldMesh();
 
