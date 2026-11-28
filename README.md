@@ -17,11 +17,12 @@
 - Using C (This was one of my first large-scale projects with C, and I had to learn a lot about OpenGL, pointers, shaders, the heap vs. stack, etc.)
 
 ## How to Run This
-1. Clone the source code to your device.
+1. Option 1: Navigate to the releases section and select the most recent build and download -> run main.exe
+2. Option 2: Clone the source code to your device.
 ```sh
 git clone https://github.com/devPenguin55/Eldengrove.git
 ```
-3. Run main.exe directly if on Windows from the Eldengrove directory. (This project is intended solely for Windows users right now).
+3. (continued) Run main.exe directly if on Windows from the Eldengrove directory. (This project is intended solely for Windows users right now).
 ```sh
 ./main.exe
 ```
