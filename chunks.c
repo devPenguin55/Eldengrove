@@ -31,6 +31,344 @@ static inline float clamp(float value, float minVal, float maxVal)
     return value;
 }
 
+// void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, int flag, uint64_t key)
+// {
+//     chunk->chunkStartX = xAdd;
+//     chunk->chunkStartZ = zAdd;
+
+//     chunk->key = key;
+//     chunk->hasMesh = 0;
+//     chunk->hasVertices = 0;
+//     chunk->hasWaterVertices = 0;
+//     chunk->firstQuadIndex = -1;
+//     chunk->lastQuadIndex = -1;
+//     chunk->triggerVertexDeletion = 0;
+//     chunk->triggerVertexRecreation = 0;
+
+//     chunk->firstVertex = -1;
+//     chunk->lastVertex = -1;
+//     chunk->firstWaterVertex = -1;
+//     chunk->lastWaterVertex = -1;
+
+//     chunk->flag = -1;
+
+//     chunk->isDirty = 0;
+//     chunk->lightDirty = 0;
+
+//     chunk->gpuLightIndex = -1;
+
+//     chunk->isInitialLightCreated = 0;
+
+//     chunk->lightData = calloc(1, sizeof(uint8_t) * ChunkWidthX * ChunkLengthZ * ChunkHeightY);
+
+//     static int rawHeightMap[ChunkWidthX * ChunkLengthZ];
+//     static int heightMap[ChunkWidthX * ChunkLengthZ];
+//     static int blurTmp[ChunkWidthX * ChunkLengthZ];
+
+
+//     for (int x = 0; x < ChunkWidthX; x++)
+//     {
+//         for (int z = 0; z < ChunkLengthZ; z++)
+//         {
+//             float worldX = BlockWidthX * x + xAdd;
+//             float worldZ = BlockLengthZ * z + zAdd;
+
+//             // rolling hills
+//             float rolling = fbm2D(worldX / 90.0f, worldZ / 90.0f, 4, 2, 2.0, 5.0);
+
+//             // occasional bigger hills/mountains 
+//             float bigHills = ridgedFbm2D(worldX / 60.0f, worldZ / 60.0f, 5, 3, 2.0, 0.5);
+
+//             float plainsMask = fbm2D(worldX / 320.0f, worldZ / 320.0f, 3, 2, 2.0, 3.0);
+//             plainsMask = clamp((plainsMask + 1.0f) * 0.5f, 0.15f, 1.0f); 
+
+//             int h = 34;
+//             h += (int)(rolling * 50.0f * plainsMask);
+//             h += (int)(bigHills * 50.0f * plainsMask);
+
+            
+
+//             rawHeightMap[x + z * ChunkWidthX] = h;
+//         }
+//     }
+
+//     for (int x = 0; x < ChunkWidthX; x++)
+//         for (int z = 0; z < ChunkLengthZ; z++)
+//             blurTmp[x + z * ChunkWidthX] = rawHeightMap[x + z * ChunkWidthX];
+
+//     for (int pass = 0; pass < 2; pass++)
+//     {
+//         for (int x = 0; x < ChunkWidthX; x++)
+//         {
+//             for (int z = 0; z < ChunkLengthZ; z++)
+//             {
+//                 if (x == 0 || x == ChunkWidthX - 1 || z == 0 || z == ChunkLengthZ - 1)
+//                 {
+//                     heightMap[x + z * ChunkWidthX] = blurTmp[x + z * ChunkWidthX];
+//                     continue;
+//                 }
+
+//                 int sum = 0, count = 0;
+//                 for (int dx = -1; dx <= 1; dx++)
+//                     for (int dz = -1; dz <= 1; dz++)
+//                     {
+//                         sum += blurTmp[(x + dx) + (z + dz) * ChunkWidthX];
+//                         count++;
+//                     }
+//                 heightMap[x + z * ChunkWidthX] = sum / count;
+//             }
+//         }
+//         for (int i = 0; i < ChunkWidthX * ChunkLengthZ; i++)
+//             blurTmp[i] = heightMap[i];
+//     }
+
+//     for (int x = 0; x < ChunkWidthX; x++)
+//     {
+//         for (int z = 0; z < ChunkLengthZ; z++)
+//         {
+//             int generatedBlockNoiseHeight = heightMap[x + z * ChunkWidthX];
+
+//             for (int y = 0; y < ChunkHeightY; y++)
+//             {
+//                 Block *curBlock = &(chunk->blocks[x + ChunkWidthX * z + (ChunkWidthX * ChunkLengthZ) * y]);
+
+//                 curBlock->blockType = -1;
+//                 curBlock->x = BlockWidthX * x + xAdd;
+//                 curBlock->z = BlockLengthZ * z + zAdd;
+//                 curBlock->y = BlockHeightY * (y);
+//                 curBlock->isSlope = 0;
+
+//                 float worldX = curBlock->x;
+//                 float worldZ = curBlock->z;
+
+//                 curBlock->isAir = (y > generatedBlockNoiseHeight);
+
+//                 if (!curBlock->isAir)
+//                 {
+//                     if (y > 10 && y < 55)
+//                     {
+//                         int yboost = 15;
+
+//                         float base = perlinNoise3D(worldX / 22.0f, (y + yboost) / 22.0f, worldZ / 22.0f, 3);
+//                         float ridged = 1.0f - fabs(base);
+
+//                         float caveRegion = fbm2D(worldX / 60.0f, worldZ / 60.0f, 3, 2, 2.0, 3.0);
+
+//                         if (caveRegion > 0.05f)
+//                         {
+//                             curBlock->isAir = (ridged > 0.85f);
+//                         }
+//                     }
+//                 }
+
+//                 if (curBlock->isAir)
+//                 {
+//                     curBlock->blockType = -1;
+//                 }
+//                 else
+//                 {
+//                     if (y == generatedBlockNoiseHeight)
+//                     {
+//                         if (generatedBlockNoiseHeight <= SEA_LEVEL + 1 && perlinNoise3D(worldX / 25.0f, (y + 5) / 25.0f, worldZ / 25.0f, 3) < 0.05)
+//                         {
+//                             curBlock->blockType = BLOCK_TYPE_RED_CLAY;
+//                         }
+//                         else if (generatedBlockNoiseHeight <= SEA_LEVEL)
+//                         {
+//                             curBlock->blockType = BLOCK_TYPE_DIRT;
+//                         }
+//                         else
+//                         {
+//                             curBlock->blockType = BLOCK_TYPE_GRASS;
+//                         }
+//                     }
+//                     else if (y < generatedBlockNoiseHeight && y >= generatedBlockNoiseHeight - 1)
+//                     {
+//                         curBlock->blockType = (y < SEA_LEVEL) ? BLOCK_TYPE_RED_CLAY : BLOCK_TYPE_DIRT;
+//                     }
+//                     else
+//                     {
+//                         curBlock->blockType = BLOCK_TYPE_STONE;
+//                     }
+//                 }
+
+//                 if (curBlock->isAir && y < SEA_LEVEL)
+//                 {
+//                     curBlock->isAir = 0;
+//                     curBlock->blockType = BLOCK_TYPE_WATER;
+//                 }
+//             }
+//         }
+//     }
+
+//     for (int x = 1; x < ChunkWidthX - 1; x++)
+//     {
+//         for (int z = 1; z < ChunkLengthZ - 1; z++)
+//         {
+//             int h = heightMap[x + z * ChunkWidthX];
+//             if (h < 0 || h >= ChunkHeightY)
+//                 continue;
+
+//             int hEast  = heightMap[(x + 1) + z * ChunkWidthX];
+//             int hWest  = heightMap[(x - 1) + z * ChunkWidthX];
+//             int hSouth = heightMap[x + (z + 1) * ChunkWidthX];
+//             int hNorth = heightMap[x + (z - 1) * ChunkWidthX];
+
+//             int dir = 0;
+//             if (hSouth == h - 1) dir = 1;
+//             else if (hEast  == h - 1) dir = 2;
+//             else if (hNorth == h - 1) dir = 3;
+//             else if (hWest  == h - 1) dir = 4;
+
+//             if (dir == 0)
+//                 continue; 
+
+//             Block *b = &(chunk->blocks[x + ChunkWidthX * z + (ChunkWidthX * ChunkLengthZ) * h]);
+//             if (b->isAir || b->blockType == BLOCK_TYPE_WATER || b->blockType == -1)
+//                 continue;
+
+//             b->isSlope = dir;
+//         }
+//     }
+
+//     for (int x = 0; x < ChunkWidthX; x++)
+//     {
+//         for (int z = 0; z < ChunkLengthZ; z++)
+//         {
+//             int surfaceY = -1;
+
+//             for (int y = ChunkHeightY - 2; y >= 0; y--)
+//             {
+//                 Block *b = &(chunk->blocks[x + ChunkWidthX * z + (ChunkWidthX * ChunkLengthZ) * y]);
+//                 Block *above = &(chunk->blocks[x + ChunkWidthX * z + (ChunkWidthX * ChunkLengthZ) * (y + 1)]);
+
+//                 if (!b->isAir && above->isAir && b->blockType == BLOCK_TYPE_GRASS)
+//                 {
+//                     surfaceY = y + 1;
+//                     break;
+//                 }
+//             }
+
+//             if (surfaceY == -1)
+//                 continue;
+//             if (x < 4 || x >= ChunkWidthX - 4 || z < 4 || z >= ChunkLengthZ - 4)
+//                 continue;
+
+//             Block *surfaceBlock = &(chunk->blocks[x + ChunkWidthX * z + (ChunkWidthX * ChunkLengthZ) * (surfaceY - 1)]);
+//             if (surfaceBlock->isSlope)
+//                 continue;
+
+//             float worldX = x + chunk->chunkStartX;
+//             float worldZ = z + chunk->chunkStartZ;
+
+
+//             int treeValid = !(fbm2D(worldX / 1.5f, worldZ / 1.5f, 5, 2, 2.0, 5.0) <= 0.15f);
+//             int flowerValid = fbm2D(worldX / 10.f, worldZ / 10.f, 5, 2, 2.0, 5.0) > 0.37f;
+//             int shortGrassValid = fbm2D(worldX / 1.2f, worldZ / 10.f, 5, 2, 2.0, 5.0) > 0.30f;
+//             int shrubValid = fbm2D(worldX / 6.f, worldZ / 6.f, 4, 2, 2.0, 3.0) > 0.55f;
+
+//             if (flowerValid && !treeValid && !shortGrassValid)
+//             {
+//                 Block *b = &(chunk->blocks[x + ChunkWidthX * z + (ChunkWidthX * ChunkLengthZ) * surfaceY]);
+//                 b->blockType = BLOCK_TYPE_ORCHID;
+//                 b->isAir = 0;
+//                 continue;
+//             }
+
+//             if (shortGrassValid && !treeValid)
+//             {
+//                 Block *b = &(chunk->blocks[x + ChunkWidthX * z + (ChunkWidthX * ChunkLengthZ) * surfaceY]);
+//                 b->blockType = BLOCK_TYPE_SHORT_GRASS;
+//                 b->isAir = 0;
+//                 continue;
+//             }
+
+//             if (!treeValid)
+//             continue;
+
+//             int trunkHeight = 10 + (int)(fbm2D(worldX, worldZ, 1, 1, 1, 1) * 5);
+
+//             for (int yAdd = 0; yAdd < trunkHeight-5; yAdd++)
+//             {
+//                 int newY = surfaceY + yAdd;
+//                 if (newY >= ChunkHeightY)
+//                     break;
+
+//                 Block *b = &(chunk->blocks[x + ChunkWidthX * z + (ChunkWidthX * ChunkLengthZ) * newY]);
+//                 b->blockType = BLOCK_TYPE_OAK;
+//                 b->isAir = 0;
+//             }
+
+//             int canopyBaseY = surfaceY + 3;               
+//             int canopyTopY  = surfaceY + trunkHeight;
+//             int numLayers   = canopyTopY - canopyBaseY;
+
+//             if (numLayers < 3)
+//                 numLayers = 3;
+
+//             int maxRadius = 3;
+
+//             for (int layer = 0; layer < numLayers; layer++)
+//             {
+//                 int layerY = canopyBaseY + layer;
+//                 if (layerY < 0 || layerY >= ChunkHeightY)
+//                     continue;
+
+//                 int radius = maxRadius - (int)((float)(maxRadius) * layer / (float)(numLayers - 1) + 0.5f);
+//                 if (radius < 0) radius = 0;
+
+//                 int nextRadius = 0;
+//                 if (layer + 1 < numLayers)
+//                 {
+//                     nextRadius = maxRadius - (int)((float)(maxRadius) * (layer + 1) / (float)(numLayers - 1) + 0.5f);
+//                     if (nextRadius < 0) nextRadius = 0;
+//                 }
+//                 int isTopRing = (radius > 0 && nextRadius == 0);
+
+//                 for (int xOff = -radius; xOff <= radius; xOff++)
+//                 {
+//                     for (int zOff = -radius; zOff <= radius; zOff++)
+//                     {
+//                         int manhattan = abs(xOff) + abs(zOff);
+//                         if (manhattan > radius + 1)
+//                             continue;
+
+//                         int isDiagonalCorner = (manhattan == radius + 1);
+
+//                         if (isTopRing && isDiagonalCorner)
+//                             continue;
+
+//                         int newX = x + xOff, newZ = z + zOff;
+//                         if (newX < 0 || newX >= ChunkWidthX || newZ < 0 || newZ >= ChunkLengthZ)
+//                             continue;
+
+//                         Block *b = &(chunk->blocks[newX + ChunkWidthX * newZ + (ChunkWidthX * ChunkLengthZ) * layerY]);
+//                         if (b->blockType == BLOCK_TYPE_OAK)
+//                             continue;
+
+//                         b->blockType = BLOCK_TYPE_LEAVES;
+//                         b->isAir = 0;
+
+//                         int absX = abs(xOff), absZ = abs(zOff);
+//                         int distFromEdge = radius - ((absX > absZ) ? absX : absZ);
+
+//                         if (radius > 0 && (distFromEdge <= 0 || isDiagonalCorner))
+//                         {
+//                             if (absX >= absZ)
+//                                 b->isSlope = (xOff > 0) ? 2 : 4;
+//                             else
+//                                 b->isSlope = (zOff > 0) ? 1 : 3;
+//                         }
+//                     }
+//                 }
+
+//                 if (radius == 0)
+//                     break;
+//             }
+//         }
+//     }
+// }
+
 void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, int flag, uint64_t key)
 {
     chunk->chunkStartX = xAdd;
@@ -74,17 +412,17 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
             float worldZ = BlockLengthZ * z + zAdd;
 
             // rolling hills
-            float rolling = fbm2D(worldX / 90.0f, worldZ / 90.0f, 4, 2, 2.0, 5.0);
+            float rolling = fbm2D(worldX / 60.0f, worldZ / 60.0f, 4, 2, 2.0, 5.0);
 
             // occasional bigger hills/mountains 
-            float bigHills = ridgedFbm2D(worldX / 60.0f, worldZ / 60.0f, 5, 3, 2.0, 0.5);
+            float bigHills = ridgedFbm2D(worldX / 30.0f, worldZ / 30.0f, 5, 3, 2.0, 0.5);
 
-            float plainsMask = fbm2D(worldX / 320.0f, worldZ / 320.0f, 3, 2, 2.0, 3.0);
+            float plainsMask = fbm2D(worldX / 620.0f, worldZ / 620.0f, 3, 2, 2.0, 3.0);
             plainsMask = clamp((plainsMask + 1.0f) * 0.5f, 0.15f, 1.0f); 
 
             int h = 34;
-            h += (int)(rolling * 50.0f * plainsMask);
-            h += (int)(bigHills * 50.0f * plainsMask);
+            h += (int)(rolling  * 80.0f * plainsMask);
+            h += (int)(bigHills * 80.0f * plainsMask);
 
             
 
@@ -127,9 +465,6 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
         for (int z = 0; z < ChunkLengthZ; z++)
         {
             int generatedBlockNoiseHeight = heightMap[x + z * ChunkWidthX];
-
-            // ! WARNING ! REMOVE !
-            // generatedBlockNoiseHeight = 34;
 
             for (int y = 0; y < ChunkHeightY; y++)
             {
@@ -231,143 +566,6 @@ void createChunk(Chunk *chunk, GLfloat xAdd, GLfloat zAdd, int isFirstCreation, 
                 continue;
 
             b->isSlope = dir;
-        }
-    }
-
-    for (int x = 0; x < ChunkWidthX; x++)
-    {
-        for (int z = 0; z < ChunkLengthZ; z++)
-        {
-            int surfaceY = -1;
-
-            for (int y = ChunkHeightY - 2; y >= 0; y--)
-            {
-                Block *b = &(chunk->blocks[x + ChunkWidthX * z + (ChunkWidthX * ChunkLengthZ) * y]);
-                Block *above = &(chunk->blocks[x + ChunkWidthX * z + (ChunkWidthX * ChunkLengthZ) * (y + 1)]);
-
-                if (!b->isAir && above->isAir && b->blockType == BLOCK_TYPE_GRASS)
-                {
-                    surfaceY = y + 1;
-                    break;
-                }
-            }
-
-            if (surfaceY == -1)
-                continue;
-            if (x < 4 || x >= ChunkWidthX - 4 || z < 4 || z >= ChunkLengthZ - 4)
-                continue;
-
-            Block *surfaceBlock = &(chunk->blocks[x + ChunkWidthX * z + (ChunkWidthX * ChunkLengthZ) * (surfaceY - 1)]);
-            if (surfaceBlock->isSlope)
-                continue;
-
-            float worldX = x + chunk->chunkStartX;
-            float worldZ = z + chunk->chunkStartZ;
-
-
-            int treeValid = !(fbm2D(worldX / 1.5f, worldZ / 1.5f, 5, 2, 2.0, 5.0) <= 0.15f);
-            int flowerValid = fbm2D(worldX / 10.f, worldZ / 10.f, 5, 2, 2.0, 5.0) > 0.37f;
-            int shortGrassValid = fbm2D(worldX / 1.2f, worldZ / 10.f, 5, 2, 2.0, 5.0) > 0.30f;
-            int shrubValid = fbm2D(worldX / 6.f, worldZ / 6.f, 4, 2, 2.0, 3.0) > 0.55f;
-
-            if (flowerValid && !treeValid && !shortGrassValid)
-            {
-                Block *b = &(chunk->blocks[x + ChunkWidthX * z + (ChunkWidthX * ChunkLengthZ) * surfaceY]);
-                b->blockType = BLOCK_TYPE_ORCHID;
-                b->isAir = 0;
-                continue;
-            }
-
-            if (shortGrassValid && !treeValid)
-            {
-                Block *b = &(chunk->blocks[x + ChunkWidthX * z + (ChunkWidthX * ChunkLengthZ) * surfaceY]);
-                b->blockType = BLOCK_TYPE_SHORT_GRASS;
-                b->isAir = 0;
-                continue;
-            }
-
-            if (!treeValid)
-            continue;
-
-            int trunkHeight = 10 + (int)(fbm2D(worldX, worldZ, 1, 1, 1, 1) * 5);
-
-            for (int yAdd = 0; yAdd < trunkHeight-5; yAdd++)
-            {
-                int newY = surfaceY + yAdd;
-                if (newY >= ChunkHeightY)
-                    break;
-
-                Block *b = &(chunk->blocks[x + ChunkWidthX * z + (ChunkWidthX * ChunkLengthZ) * newY]);
-                b->blockType = BLOCK_TYPE_OAK;
-                b->isAir = 0;
-            }
-
-            int canopyBaseY = surfaceY + 3;               
-            int canopyTopY  = surfaceY + trunkHeight;
-            int numLayers   = canopyTopY - canopyBaseY;
-
-            if (numLayers < 3)
-                numLayers = 3;
-
-            int maxRadius = 3;
-
-            for (int layer = 0; layer < numLayers; layer++)
-            {
-                int layerY = canopyBaseY + layer;
-                if (layerY < 0 || layerY >= ChunkHeightY)
-                    continue;
-
-                int radius = maxRadius - (int)((float)(maxRadius) * layer / (float)(numLayers - 1) + 0.5f);
-                if (radius < 0) radius = 0;
-
-                int nextRadius = 0;
-                if (layer + 1 < numLayers)
-                {
-                    nextRadius = maxRadius - (int)((float)(maxRadius) * (layer + 1) / (float)(numLayers - 1) + 0.5f);
-                    if (nextRadius < 0) nextRadius = 0;
-                }
-                int isTopRing = (radius > 0 && nextRadius == 0);
-
-                for (int xOff = -radius; xOff <= radius; xOff++)
-                {
-                    for (int zOff = -radius; zOff <= radius; zOff++)
-                    {
-                        int manhattan = abs(xOff) + abs(zOff);
-                        if (manhattan > radius + 1)
-                            continue;
-
-                        int isDiagonalCorner = (manhattan == radius + 1);
-
-                        if (isTopRing && isDiagonalCorner)
-                            continue;
-
-                        int newX = x + xOff, newZ = z + zOff;
-                        if (newX < 0 || newX >= ChunkWidthX || newZ < 0 || newZ >= ChunkLengthZ)
-                            continue;
-
-                        Block *b = &(chunk->blocks[newX + ChunkWidthX * newZ + (ChunkWidthX * ChunkLengthZ) * layerY]);
-                        if (b->blockType == BLOCK_TYPE_OAK)
-                            continue;
-
-                        b->blockType = BLOCK_TYPE_LEAVES;
-                        b->isAir = 0;
-
-                        int absX = abs(xOff), absZ = abs(zOff);
-                        int distFromEdge = radius - ((absX > absZ) ? absX : absZ);
-
-                        if (radius > 0 && (distFromEdge <= 0 || isDiagonalCorner))
-                        {
-                            if (absX >= absZ)
-                                b->isSlope = (xOff > 0) ? 2 : 4;
-                            else
-                                b->isSlope = (zOff > 0) ? 1 : 3;
-                        }
-                    }
-                }
-
-                if (radius == 0)
-                    break;
-            }
         }
     }
 }

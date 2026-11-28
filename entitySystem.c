@@ -718,19 +718,8 @@ void worldEntityUpdate() {
                 placeBlockAndRebuild(bx, by, bz, BLOCK_TYPE_ENTITY_PLACED);
             }
         }
-        
+
         updateEntityPhysics(curEntity);
-        curEntity->rotation.x = player.position.x - curEntity->position.x;
-        curEntity->rotation.z = player.position.z - curEntity->position.z;
-        float rlen = sqrtf(curEntity->rotation.x*curEntity->rotation.x + curEntity->rotation.z*curEntity->rotation.z);
-
-        if (rlen > 0.001f) {
-            curEntity->rotation.x = curEntity->rotation.x / rlen;
-            curEntity->rotation.z = curEntity->rotation.z / rlen;
-        }
-
-        curEntity->rotation.x *= -360.0f;
-        curEntity->rotation.z *= -360.0f;
         
         AnimatedModel *model = &modelManager.animatedModels[curEntity->animatedModelIndex];
         updateAnimatedModelInstanceTransformOnly(

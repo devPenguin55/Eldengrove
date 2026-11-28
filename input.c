@@ -590,9 +590,6 @@ void handleUserMovement()
     }
 
     if (length > 0.0f) {
-
-
-
         float projectedX = moveX;
         float projectedY = 0.0f;
         float projectedZ = moveZ;
