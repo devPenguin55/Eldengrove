@@ -12,7 +12,7 @@
 #define MAX4(a, b, c, d) (MAX(MAX(a, b), MAX(c, d)))
 
 ChunkLoaderManager chunkLoaderManager;
-
+int initialAmtLoadedChunksUntilMeshing = 0;
 
 void initChunkLoaderManager()
 {
@@ -204,7 +204,7 @@ void deleteHashmapEntry(uint64_t key)
     free(currentNode->chunkEntry);
     free(currentNode);
 }
-int initialAmtLoadedChunksUntilMeshing = 0;
+
 void loadChunks(GLfloat playerCoords[2])
 {
     int playerChunkX = (int)floor(playerCoords[0] / (ChunkWidthX * BlockWidthX));

@@ -20,6 +20,8 @@ extern int beginBlockBreakingIndex;
 extern GLfloat eyeX;
 extern GLfloat eyeY;
 extern GLfloat eyeZ;
+extern float yaw;
+extern float pitch;
 
 void toggleFullscreen();
 void handleKeyDown(unsigned char key, int x, int y);

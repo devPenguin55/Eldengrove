@@ -8,6 +8,7 @@
 #include "chunkLoaderManager.h"
 #include "player.h"
 #include "audio.h"
+#include "sceneManager.h"
 
 GLfloat PlayerDirX = -5;
 GLfloat PlayerDirY = 0;
@@ -633,22 +634,31 @@ void handleUserMovement()
     }
 
     // hotbar selection (keys 1–9)
-    if (pressedKeys['1'])
+    if (pressedKeys['1']) {
         hotbarActiveSlot = 0;
-    if (pressedKeys['2'])
+    }
+    if (pressedKeys['2']) {
         hotbarActiveSlot = 1;
-    if (pressedKeys['3'])
+    }
+    if (pressedKeys['3']) {
         hotbarActiveSlot = 2;
-    if (pressedKeys['4'])
+    }
+    if (pressedKeys['4']) {
         hotbarActiveSlot = 3;
-    if (pressedKeys['5'])
+    }
+    if (pressedKeys['5']) {
         hotbarActiveSlot = 4;
-    if (pressedKeys['6'])
+    }
+    if (pressedKeys['6']) {
         hotbarActiveSlot = 5;
-    if (pressedKeys['7'])
+    }
+    if (pressedKeys['7']) {
         hotbarActiveSlot = 6;
-    if (pressedKeys['8'])
+    }
+    if (pressedKeys['8']) {
         hotbarActiveSlot = 7;
-    if (pressedKeys['9'])
+    }
+    if (pressedKeys['9']) {
         hotbarActiveSlot = 8;
+    }
 }

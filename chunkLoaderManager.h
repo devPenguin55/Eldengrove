@@ -59,6 +59,7 @@ typedef struct ChunkLoaderManager {
 } ChunkLoaderManager;
 
 extern ChunkLoaderManager chunkLoaderManager;
+extern int initialAmtLoadedChunksUntilMeshing;
 
 void initChunkLoaderManager();
 uint64_t packChunkKey(int64_t chunkX, int64_t chunkZ);

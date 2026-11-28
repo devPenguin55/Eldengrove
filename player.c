@@ -7,6 +7,8 @@
 #include "entitySystem.h"
 #include "render.h"
 
+float totTime = 0.0f;
+
 Chunk *chunkAtPosition(int voxelX, int voxelY, int voxelZ) {
     int playerChunkX = (int)floor(player.position.x / (ChunkWidthX * BlockWidthX));
     int playerChunkZ = (int)floor(player.position.z / (ChunkLengthZ * BlockLengthZ));
@@ -288,7 +290,7 @@ int entityCollides(Entity *entity) {
 
     return 0; 
 }
-float totTime = 0.0f;
+
 
 void updatePlayerPhysics(Player* player)
 {

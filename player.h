@@ -16,6 +16,8 @@ typedef struct Player {
     float height;
 } Player;
 
+extern float totTime;
+
 Chunk *chunkAtPosition(int voxelX, int voxelY, int voxelZ);
 Block *blockAtPosition(int voxelX, int voxelY, int voxelZ);
 int isSolidVoxel(int voxelX, int voxelY, int voxelZ);
